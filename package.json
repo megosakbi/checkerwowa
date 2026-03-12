@@ -1,7 +1,7 @@
 {
-  "name": "roblox-checker-api",
+  "name": "roblox-checker-backend",
   "version": "1.0.0",
-  "description": "Roblox cookie checker backend",
+  "description": "Roblox .ROBLOSECURITY checker",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
